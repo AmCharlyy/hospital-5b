@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const bcrypt = require('bcrypt'); // <-- Importamos bcrypt para hashear
 require('dotenv').config();
 const pool = require('./db'); 
 
@@ -27,11 +28,12 @@ app.get('/api/consultorios', async (req, res) => {
   }
 });
 
-// --- 2. PERSONAL: Doctores ---
+// --- 2. PERSONAL: Doctores (Obtener) ---
 app.get('/api/doctores/estado', async (req, res) => {
   try {
     const query = `
       SELECT d.id_doctor, d.nombre_doctor, e.nombre as especialidad,
+             d.cedula_profesional, d.telefono, d.correo, d.usuario,
         CASE 
           WHEN EXISTS (
             SELECT 1 FROM citas c 
@@ -55,7 +57,7 @@ app.get('/api/doctores/estado', async (req, res) => {
   }
 });
 
-// --- 3. PACIENTES ---
+// --- 3. PACIENTES (Obtener) ---
 app.get('/api/pacientes/completo', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -71,12 +73,13 @@ app.get('/api/pacientes/completo', async (req, res) => {
   }
 });
 
-// --- 4. AGENDA: Obtener todas las citas (¡ESTA RUTA FALTABA!) ---
+// --- 4. AGENDA: Obtener todas las citas ---
 app.get('/api/citas', async (req, res) => {
   try {
     const query = `
       SELECT c.id_cita, p.nombre_paciente, d.nombre_doctor, con.nombre_consultorio, 
-             TO_CHAR(c.fecha, 'YYYY-MM-DD') as fecha, c.hora, c.estado, c.tipo_cita
+             TO_CHAR(c.fecha, 'YYYY-MM-DD') as fecha, c.hora, c.estado, c.tipo_cita,
+             c.id_paciente, c.id_doctor, c.id_consultorio
       FROM citas c
       JOIN pacientes p ON c.id_paciente = p.id_paciente
       JOIN doctores d ON c.id_doctor = d.id_doctor
@@ -117,7 +120,6 @@ app.post('/api/citas', async (req, res) => {
       [id_paciente, fecha, id_consultorio || null, id_doctor, tipo_cita || 'Consulta', hora]
     );
 
-    // Automatización: Cambiar consultorio a ocupado
     if (id_consultorio) {
       await pool.query('UPDATE consultorios SET disponible = false WHERE id_consultorio = $1', [id_consultorio]);
     }
@@ -129,15 +131,14 @@ app.post('/api/citas', async (req, res) => {
   }
 });
 
-// --- 6. AGENDA: Finalizar/Cancelar cita y liberar consultorio ---
+// --- 6. AGENDA: Finalizar, Confirmar o Cancelar cita ---
 app.put('/api/citas/:id/estado', async (req, res) => {
   const { id } = req.params;
-  const { estado } = req.body;
+  const { estado } = req.body; 
   
   try {
     await pool.query('UPDATE citas SET estado = $1 WHERE id_cita = $2', [estado, id]);
     
-    // Automatización: Liberar consultorio si se finaliza o cancela
     if (estado === 'Cancelada' || estado === 'Finalizada') {
       const citaRes = await pool.query('SELECT id_consultorio FROM citas WHERE id_cita = $1', [id]);
       
@@ -146,7 +147,122 @@ app.put('/api/citas/:id/estado', async (req, res) => {
       }
     }
 
-    res.json({ message: `Cita actualizada a ${estado}` });
+    res.json({ message: `Cita actualizada a ${estado} correctamente` });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- 7. PERSONAL: Añadir nuevo Doctor ---
+app.post('/api/doctores', async (req, res) => {
+  const { nombre, cedula_profesional, telefono, correo, usuario, contrasena } = req.body;
+  
+  if (!nombre) {
+    return res.status(400).json({ error: "El nombre es obligatorio." });
+  }
+
+  try {
+    const nuevoDoctor = await pool.query(
+      `INSERT INTO doctores (nombre_doctor, cedula_profesional, telefono, correo, usuario, contrasena, estado) 
+       VALUES ($1, $2, $3, $4, $5, $6, 'Activo') RETURNING *`,
+      [nombre, cedula_profesional, telefono, correo, usuario, contrasena]
+    );
+
+    res.status(201).json(nuevoDoctor.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- 8. PERSONAL: Eliminar Doctor (Soft Delete o Baja) ---
+app.delete('/api/doctores/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query("UPDATE doctores SET estado = 'Inactivo' WHERE id_doctor = $1", [id]);
+    res.json({ message: "Doctor dado de baja exitosamente" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- 9. PACIENTES: Registrar nuevo paciente con contraseña hasheada ---
+app.post('/api/pacientes', async (req, res) => {
+  const { nombre_paciente, curp, numero_telefono, contrasena_plana } = req.body;
+
+  if (!nombre_paciente || !curp || !numero_telefono || !contrasena_plana) {
+    return res.status(400).json({ error: "Faltan datos obligatorios." });
+  }
+
+  try {
+    const contrasenaHasheada = await bcrypt.hash(contrasena_plana, 10);
+
+    const nuevoPaciente = await pool.query(
+      `INSERT INTO pacientes (nombre_paciente, curp, numero_telefono, status, contrasena) 
+       VALUES ($1, $2, $3, 1, $4) RETURNING *`,
+      [nombre_paciente, curp, numero_telefono, contrasenaHasheada]
+    );
+
+    res.status(201).json(nuevoPaciente.rows[0]);
+  } catch (error) {
+    console.error(error);
+    if (error.code === '23505') { 
+        return res.status(400).json({ error: "El CURP ingresado ya está registrado en el sistema." });
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- 10. PACIENTES: Editar datos del paciente ---
+app.put('/api/pacientes/:id', async (req, res) => {
+  const { id } = req.params;
+  const { nombre_paciente, curp, numero_telefono } = req.body;
+
+  try {
+    await pool.query(
+      `UPDATE pacientes 
+       SET nombre_paciente = $1, curp = $2, numero_telefono = $3
+       WHERE id_paciente = $4`,
+      [nombre_paciente, curp, numero_telefono, id]
+    );
+    res.json({ message: "Paciente actualizado correctamente" });
+  } catch (error) {
+    if (error.code === '23505') {
+        return res.status(400).json({ error: "Esa CURP ya está asignada a otro paciente." });
+    }
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- 11. PACIENTES: Cambiar estado (Activar/Desactivar) ---
+app.put('/api/pacientes/:id/estado', async (req, res) => {
+  const { id } = req.params;
+  const { id_status } = req.body; 
+
+  try {
+    await pool.query('UPDATE pacientes SET status = $1 WHERE id_paciente = $2', [id_status, id]);
+    res.json({ message: "Estado del paciente actualizado" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- 12. PACIENTES: Generar nueva contraseña ---
+app.put('/api/pacientes/:id/password', async (req, res) => {
+  const { id } = req.params;
+  const { contrasena_plana } = req.body;
+
+  if(!contrasena_plana) return res.status(400).json({ error: "Falta la nueva contraseña" });
+
+  try {
+    const contrasenaHasheada = await bcrypt.hash(contrasena_plana, 10);
+    await pool.query('UPDATE pacientes SET contrasena = $1 WHERE id_paciente = $2', [contrasenaHasheada, id]);
+    
+    res.json({ message: "Contraseña actualizada exitosamente" });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: error.message });
