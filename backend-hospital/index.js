@@ -99,10 +99,12 @@ app.get('/api/doctores/estado', async (req, res) => {
 });
 
 // --- 3. PACIENTES (Obtener) ---
+// --- 3. PACIENTES (Obtener) ---
 app.get('/api/pacientes/completo', async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT p.id_paciente, p.nombre_paciente, p.curp, p.numero_telefono, s.status as estado 
+      SELECT p.id_paciente, p.nombre_paciente, p.curp, p.numero_telefono, 
+             p.edad, p.sexo, p.correo, s.status as estado 
       FROM pacientes p 
       LEFT JOIN status s ON p.status = s.id_status
       ORDER BY p.id_paciente DESC
