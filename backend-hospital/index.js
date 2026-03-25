@@ -158,17 +158,20 @@ app.put('/api/citas/:id/estado', async (req, res) => {
 app.post('/api/doctores', async (req, res) => {
   const { nombre, cedula_profesional, telefono, correo, usuario, contrasena } = req.body;
   
-  if (!nombre) {
+  if (!nombre || !contrasena) {
     return res.status(400).json({ error: "El nombre es obligatorio." });
   }
 
   try {
+    //Hash contraseñas function
+    const contrasenaHasheada = await bcrypt.hash(contrasena, 10);
+
     const nuevoDoctor = await pool.query(
       `INSERT INTO doctores (nombre_doctor, cedula_profesional, telefono, correo, usuario, contrasena, estado) 
        VALUES ($1, $2, $3, $4, $5, $6, 'Activo') RETURNING *`,
-      [nombre, cedula_profesional, telefono, correo, usuario, contrasena]
+      [nombre, cedula_profesional, telefono, correo, usuario, contrasenaHasheada]
     );
-
+    
     res.status(201).json(nuevoDoctor.rows[0]);
   } catch (error) {
     console.error(error);
