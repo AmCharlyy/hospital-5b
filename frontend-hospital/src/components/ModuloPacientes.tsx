@@ -69,9 +69,9 @@ export function ModuloPacientes() {
           numero_telefono: nuevoPaciente.numero_telefono, // Si tu backend solo guarda el numero
           // Opcionalmente, si decides añadir estas columnas a tu BD en el futuro:
           // codigo_pais: nuevoPaciente.codigo_pais,
-          // edad: nuevoPaciente.edad,
-          // sexo: nuevoPaciente.sexo,
-          // correo: nuevoPaciente.correo,
+          edad: nuevoPaciente.edad,
+          sexo: nuevoPaciente.sexo,
+          correo: nuevoPaciente.correo,
           contrasena_plana: nuevaContrasena 
         })
       });
@@ -112,12 +112,12 @@ export function ModuloPacientes() {
         body: JSON.stringify({
           nombre_paciente: pacienteAEditar.nombre_paciente,
           curp: pacienteAEditar.curp,
-          numero_telefono: pacienteAEditar.numero_telefono
+          numero_telefono: pacienteAEditar.numero_telefono,
           // Si añades más columnas al PUT de tu backend:
           // codigo_pais: pacienteAEditar.codigo_pais,
-          // correo: pacienteAEditar.correo,
-          // edad: pacienteAEditar.edad,
-          // sexo: pacienteAEditar.sexo
+          correo: pacienteAEditar.correo,
+          edad: pacienteAEditar.edad,
+          sexo: pacienteAEditar.sexo
         })
       });
 
