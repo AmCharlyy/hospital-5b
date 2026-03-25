@@ -11,6 +11,47 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
+async function enviarWhatsApp(telefono, nombrePlantilla, variables) {
+  const WA_PHONE_ID = process.env.WA_PHONE_ID;
+  const WA_TOKEN = process.env.WA_TOKEN;
+
+  // Formatear las variables para la API de Meta
+  const parameters = variables.map(text => ({ type: "text", text: String(text) }));
+
+  const data = {
+    messaging_product: "whatsapp",
+    to: telefono, // Debe incluir el código de país, ej. 52 para México
+    type: "template",
+    template: {
+      name: nombrePlantilla,
+      language: { code: "es_MX" },
+      components: [
+        {
+          type: "body",
+          parameters: parameters
+        }
+      ]
+    }
+  };
+
+  try {
+    const response = await fetch(`https://graph.facebook.com/v18.0/${WA_PHONE_ID}/messages`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${WA_TOKEN}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(data)
+    });
+    
+    const result = await response.json();
+    if (result.error) console.error("Error de WhatsApp:", result.error.message);
+    else console.log("WhatsApp enviado con éxito a", telefono);
+  } catch (error) {
+    console.error("Fallo al conectar con Meta:", error);
+  }
+}
+
 // --- 1. INFRAESTRUCTURA ---
 app.get('/api/consultorios', async (req, res) => {
   try {
@@ -131,23 +172,62 @@ app.post('/api/citas', async (req, res) => {
   }
 });
 
-// --- 6. AGENDA: Finalizar, Confirmar o Cancelar cita ---
+// --- AGENDA: Finalizar, Cancelar o Confirmar cita y avisar por WhatsApp ---
 app.put('/api/citas/:id/estado', async (req, res) => {
   const { id } = req.params;
-  const { estado } = req.body; 
+  const { estado } = req.body;
   
   try {
+    // 1. Actualizar el estado en la BD
     await pool.query('UPDATE citas SET estado = $1 WHERE id_cita = $2', [estado, id]);
     
-    if (estado === 'Cancelada' || estado === 'Finalizada') {
+    // 2. Liberar consultorio si se finaliza o cancela
+    if (estado === 'Cancelada' || estado === 'Finalizada' || estado === 'Rechazada') {
       const citaRes = await pool.query('SELECT id_consultorio FROM citas WHERE id_cita = $1', [id]);
-      
       if (citaRes.rows.length > 0 && citaRes.rows[0].id_consultorio) {
         await pool.query('UPDATE consultorios SET disponible = true WHERE id_consultorio = $1', [citaRes.rows[0].id_consultorio]);
       }
     }
 
-    res.json({ message: `Cita actualizada a ${estado} correctamente` });
+    // 3. OBTENER DATOS PARA EL WHATSAPP
+    // Traemos la información completa cruzando las tablas pacientes, doctores y consultorios
+    const datosCita = await pool.query(`
+      SELECT p.numero_telefono, p.nombre_paciente, c.hora, 
+             TO_CHAR(c.fecha, 'YYYY-MM-DD') as fecha, d.nombre_doctor, con.nombre_consultorio
+      FROM citas c
+      JOIN pacientes p ON c.id_paciente = p.id_paciente
+      JOIN doctores d ON c.id_doctor = d.id_doctor
+      LEFT JOIN consultorios con ON c.id_consultorio = con.id_consultorio
+      WHERE c.id_cita = $1
+    `, [id]);
+
+    if (datosCita.rows.length > 0) {
+      const info = datosCita.rows[0];
+      
+      // Revisando tu BD, algunos números ya tienen el 52 (ej. 524291300408) y otros no.
+      // Si no empieza con 52, se lo agregamos (asumiendo que estás en México).
+      let telefono = info.numero_telefono;
+      if (!telefono.startsWith("52")) telefono = "52" + telefono;
+
+      // 4. DISPARAR EL MENSAJE SEGÚN EL ESTADO
+      if (estado === 'Confirmada') {
+        // Variables: {{1}}nombre, {{2}}fecha, {{3}}hora, {{4}}doctor, {{5}}consultorio
+        const vars = [info.nombre_paciente, info.fecha, info.hora, info.nombre_doctor, info.nombre_consultorio || "Por asignar"];
+        enviarWhatsApp(telefono, "cita_confirmada", vars);
+      } 
+      else if (estado === 'Cancelada') {
+        // Variables: {{1}}nombre, {{2}}fecha, {{3}}hora
+        const vars = [info.nombre_paciente, info.fecha, info.hora];
+        enviarWhatsApp(telefono, "cita_cancelada", vars);
+      }
+      else if (estado === 'Rechazada') {
+        // Variables: {{1}}nombre, {{2}}fecha, {{3}}hora, {{4}}doctor
+        const vars = [info.nombre_paciente, info.fecha, info.hora, info.nombre_doctor];
+        enviarWhatsApp(telefono, "cita_rechazada", vars);
+      }
+    }
+
+    res.json({ message: `Cita actualizada a ${estado}` });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: error.message });
