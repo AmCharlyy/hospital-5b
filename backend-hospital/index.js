@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const bcrypt = require('bcrypt'); // <-- Importamos bcrypt para hashear
+const bcrypt = require('bcrypt');
 require('dotenv').config();
 const pool = require('./db'); 
 
@@ -15,12 +15,11 @@ async function enviarWhatsApp(telefono, nombrePlantilla, variables) {
   const WA_PHONE_ID = process.env.WA_PHONE_ID;
   const WA_TOKEN = process.env.WA_TOKEN;
 
-  // Formatear las variables para la API de Meta
   const parameters = variables.map(text => ({ type: "text", text: String(text) }));
 
   const data = {
     messaging_product: "whatsapp",
-    to: telefono, // Debe incluir el código de país, ej. 52 para México
+    to: telefono, 
     type: "template",
     template: {
       name: nombrePlantilla,
@@ -98,13 +97,13 @@ app.get('/api/doctores/estado', async (req, res) => {
   }
 });
 
-// --- 3. PACIENTES (Obtener) ---
+// --- 3. PACIENTES (Obtener Completo) ---
 app.get('/api/pacientes/completo', async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT p.id_paciente, p.nombre_paciente, p.curp, p.numero_telefono, 
-             p.edad, p.sexo, p.correo, s.status as estado,
-             TO_CHAR(p.fecha_registro, 'DD-MM-YYYY') as fecha_registro
+             p.edad, p.sexo, p.correo, p.num_expediente, s.status as estado,
+             TO_CHAR(p.fecha_registro, 'YYYY-MM-DD') as fecha_registro 
       FROM pacientes p 
       LEFT JOIN status s ON p.status = s.id_status
       ORDER BY p.id_paciente DESC
@@ -137,7 +136,7 @@ app.get('/api/citas', async (req, res) => {
   }
 });
 
-// --- 5. AGENDA: Crear cita y automatizar consultorio ---
+// --- 5. AGENDA: Crear cita ---
 app.post('/api/citas', async (req, res) => {
   const { id_paciente, fecha, id_consultorio, id_doctor, tipo_cita, hora } = req.body;
   if (!id_paciente || !id_doctor || !fecha || !hora) {
@@ -174,23 +173,21 @@ app.post('/api/citas', async (req, res) => {
   }
 });
 
-// --- AGENDA: Finalizar, Cancelar o Confirmar cita y avisar por WhatsApp ---
+// --- 6. AGENDA: Estado Cita & WhatsApp ---
 app.put('/api/citas/:id/estado', async (req, res) => {
   const { id } = req.params;
   const { estado } = req.body;
   
   try {
-    // 1. Actualizar el estado en la BD
     await pool.query('UPDATE citas SET estado = $1 WHERE id_cita = $2', [estado, id]);
     
-    // 2. Liberar consultorio si se finaliza o cancela
     if (estado === 'Cancelada' || estado === 'Finalizada' || estado === 'Rechazada') {
       const citaRes = await pool.query('SELECT id_consultorio FROM citas WHERE id_cita = $1', [id]);
       if (citaRes.rows.length > 0 && citaRes.rows[0].id_consultorio) {
         await pool.query('UPDATE consultorios SET disponible = true WHERE id_consultorio = $1', [citaRes.rows[0].id_consultorio]);
       }
     }
-// 3. OBTENER DATOS PARA EL WHATSAPP
+    
     const datosCita = await pool.query(`
       SELECT p.numero_telefono, p.nombre_paciente, c.hora, 
              TO_CHAR(c.fecha, 'YYYY-MM-DD') as fecha, d.nombre_doctor, con.nombre_consultorio
@@ -205,14 +202,10 @@ app.put('/api/citas/:id/estado', async (req, res) => {
       const info = datosCita.rows[0];
       let telefono = info.numero_telefono;
       
-      // RED DE SEGURIDAD: Solo enviamos WhatsApp si hay un teléfono registrado
       if (telefono) {
-        // Asegurarnos de que sea texto para que no explote la función startsWith
         telefono = String(telefono); 
-        
         if (!telefono.startsWith("52")) telefono = "52" + telefono;
 
-        // 4. DISPARAR EL MENSAJE SEGÚN EL ESTADO
         if (estado === 'Confirmada') {
           const vars = [info.nombre_paciente, info.fecha, info.hora, info.nombre_doctor, info.nombre_consultorio || "Por asignar"];
           enviarWhatsApp(telefono, "cita_confirmada", vars);
@@ -225,8 +218,6 @@ app.put('/api/citas/:id/estado', async (req, res) => {
           const vars = [info.nombre_paciente, info.fecha, info.hora, info.nombre_doctor];
           enviarWhatsApp(telefono, "cita_rechazada", vars);
         }
-      } else {
-        console.log("El paciente no tiene número de teléfono registrado. Omitiendo WhatsApp.");
       }
     }
 
@@ -237,7 +228,6 @@ app.put('/api/citas/:id/estado', async (req, res) => {
   }
 });
 
-
 // --- 7. PERSONAL: Añadir nuevo Doctor ---
 app.post('/api/doctores', async (req, res) => {
   const { nombre, cedula_profesional, telefono, correo, usuario, contrasena } = req.body;
@@ -247,7 +237,6 @@ app.post('/api/doctores', async (req, res) => {
   }
 
   try {
-    //Hash contraseñas function
     const contrasenaHasheada = await bcrypt.hash(contrasena, 10);
 
     const nuevoDoctor = await pool.query(
@@ -263,7 +252,7 @@ app.post('/api/doctores', async (req, res) => {
   }
 });
 
-// --- 7.5. PERSONAL: Editar datos del Doctor (¡NUEVO!) ---
+// --- 7.5. PERSONAL: Editar Doctor ---
 app.put('/api/doctores/:id', async (req, res) => {
   const { id } = req.params;
   const { nombre_doctor, cedula_profesional, telefono, correo } = req.body;
@@ -282,7 +271,7 @@ app.put('/api/doctores/:id', async (req, res) => {
   }
 });
 
-// --- 8. PERSONAL: Eliminar Doctor (Soft Delete o Baja) ---
+// --- 8. PERSONAL: Eliminar Doctor ---
 app.delete('/api/doctores/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -294,9 +283,8 @@ app.delete('/api/doctores/:id', async (req, res) => {
   }
 });
 
-// --- 9. PACIENTES: Registrar nuevo paciente con contraseña hasheada ---
+// --- 9. PACIENTES: Registrar Paciente ---
 app.post('/api/pacientes', async (req, res) => {
-  // 1. CORRECCIÓN: Agregamos edad, sexo, correo a la destructuración
   const { nombre_paciente, curp, numero_telefono, edad, sexo, correo, contrasena_plana } = req.body;
 
   if (!nombre_paciente || !curp || !numero_telefono || !contrasena_plana) {
@@ -306,7 +294,7 @@ app.post('/api/pacientes', async (req, res) => {
   try {
     const contrasenaHasheada = await bcrypt.hash(contrasena_plana, 10);
 
-    // 2. CORRECCIÓN: Ajustamos los VALUES para que sean 7 variables ($1 al $7)
+    // NOTA: No enviamos num_expediente aquí, la Base de Datos lo pondrá sola gracias al PASO 1
     const nuevoPaciente = await pool.query(
       `INSERT INTO pacientes 
       (nombre_paciente, curp, numero_telefono, edad, sexo, correo, status, contrasena) 
@@ -324,19 +312,17 @@ app.post('/api/pacientes', async (req, res) => {
   }
 });
 
-// --- 10. PACIENTES: Editar datos del paciente ---
+// --- 10. PACIENTES: Editar Paciente ---
 app.put('/api/pacientes/:id', async (req, res) => {
   const { id } = req.params;
-  // 1. Agregamos edad, sexo y correo a la destructuración
   const { nombre_paciente, curp, numero_telefono, edad, sexo, correo } = req.body;
 
   try {
-    // 2. Agregamos las columnas al UPDATE de SQL
     await pool.query(
       `UPDATE pacientes 
        SET nombre_paciente = $1, curp = $2, numero_telefono = $3, edad = $4, sexo = $5, correo = $6
        WHERE id_paciente = $7`,
-      [nombre_paciente, curp, numero_telefono, edad, sexo, correo, id] // 3. Pasamos los valores
+      [nombre_paciente, curp, numero_telefono, edad, sexo, correo, id] 
     );
     res.json({ message: "Paciente actualizado correctamente" });
   } catch (error) {
