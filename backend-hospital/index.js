@@ -294,7 +294,8 @@ app.delete('/api/doctores/:id', async (req, res) => {
 
 // --- 9. PACIENTES: Registrar nuevo paciente con contraseña hasheada ---
 app.post('/api/pacientes', async (req, res) => {
-  const { nombre_paciente, curp, numero_telefono, contrasena_plana } = req.body;
+  // 1. CORRECCIÓN: Agregamos edad, sexo, correo a la destructuración
+  const { nombre_paciente, curp, numero_telefono, edad, sexo, correo, contrasena_plana } = req.body;
 
   if (!nombre_paciente || !curp || !numero_telefono || !contrasena_plana) {
     return res.status(400).json({ error: "Faltan datos obligatorios." });
@@ -303,10 +304,11 @@ app.post('/api/pacientes', async (req, res) => {
   try {
     const contrasenaHasheada = await bcrypt.hash(contrasena_plana, 10);
 
+    // 2. CORRECCIÓN: Ajustamos los VALUES para que sean 7 variables ($1 al $7)
     const nuevoPaciente = await pool.query(
       `INSERT INTO pacientes 
       (nombre_paciente, curp, numero_telefono, edad, sexo, correo, status, contrasena) 
-       VALUES ($1, $2, $3, 1, $4) RETURNING *`,
+       VALUES ($1, $2, $3, $4, $5, $6, 1, $7) RETURNING *`,
       [nombre_paciente, curp, numero_telefono, edad, sexo, correo, contrasenaHasheada]
     );
 
@@ -339,6 +341,20 @@ app.put('/api/pacientes/:id', async (req, res) => {
     if (error.code === '23505') {
         return res.status(400).json({ error: "Esa CURP ya está asignada a otro paciente." });
     }
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- 11. PACIENTES: Cambiar estado (Activar/Desactivar) ---
+app.put('/api/pacientes/:id/estado', async (req, res) => {
+  const { id } = req.params;
+  const { id_status } = req.body; 
+
+  try {
+    await pool.query('UPDATE pacientes SET status = $1 WHERE id_paciente = $2', [id_status, id]);
+    res.json({ message: "Estado del paciente actualizado" });
+  } catch (error) {
     console.error(error);
     res.status(500).json({ error: error.message });
   }
