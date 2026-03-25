@@ -176,6 +176,25 @@ app.post('/api/doctores', async (req, res) => {
   }
 });
 
+// --- 7.5. PERSONAL: Editar datos del Doctor (¡NUEVO!) ---
+app.put('/api/doctores/:id', async (req, res) => {
+  const { id } = req.params;
+  const { nombre_doctor, cedula_profesional, telefono, correo } = req.body;
+
+  try {
+    await pool.query(
+      `UPDATE doctores 
+       SET nombre_doctor = $1, cedula_profesional = $2, telefono = $3, correo = $4
+       WHERE id_doctor = $5`,
+      [nombre_doctor, cedula_profesional, telefono, correo, id]
+    );
+    res.json({ message: "Datos del doctor actualizados correctamente" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // --- 8. PERSONAL: Eliminar Doctor (Soft Delete o Baja) ---
 app.delete('/api/doctores/:id', async (req, res) => {
   const { id } = req.params;

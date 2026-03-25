@@ -13,6 +13,7 @@ export function DirectorioPersonal() {
   
   // Estados de Interfaz
   const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<any | null>(null);
+  const [empleadoAEditar, setEmpleadoAEditar] = useState<any | null>(null); // NUEVO ESTADO
   const [modalNuevo, setModalNuevo] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [filtroTab, setFiltroTab] = useState("Todos");
@@ -30,7 +31,7 @@ export function DirectorioPersonal() {
     consultorio: ""
   });
 
-  // 1. Conexión al Backend
+  // 1. Conexión al Backend (GET)
   const fetchEmpleados = async () => {
     try {
       const res = await fetch("http://localhost:3000/api/doctores/estado");
@@ -42,14 +43,12 @@ export function DirectorioPersonal() {
 
         return {
           id: `DOC-${doc.id_doctor}`,
-          id_real: doc.id_doctor,
+          id_real: doc.id_doctor, // Necesario para el PUT
           nombre: doc.nombre_doctor,
           rol: doc.especialidad || 'General',
           tipo: 'doctor',
           estado: doc.estado_actual || 'Disponible',
           avatar: iniciales.toUpperCase(),
-          // Si tu backend algún día devuelve estos campos, se conectarán aquí. 
-          // Por ahora los dejamos vacíos o puedes omitirlos.
           cedula_profesional: doc.cedula_profesional || "",
           telefono: doc.telefono || "",
           correo: doc.correo || "",
@@ -82,7 +81,7 @@ export function DirectorioPersonal() {
     return coincideTab && coincideBusqueda;
   });
 
-  // 3. Simulación de Crear (Hasta que tengas el POST en tu backend)
+  // 3. Simulación de Crear POST
   const handleCrear = (e: React.FormEvent) => {
     e.preventDefault();
     const iniciales = nuevoEmpleado.nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
@@ -94,13 +93,47 @@ export function DirectorioPersonal() {
       avatar: iniciales
     };
     
-    // Simula guardado en la interfaz
     setEmpleados([...empleados, empleado]);
     setModalNuevo(false);
     setNuevoEmpleado({ 
       nombre: "", rol: "", tipo: "doctor", cedula_profesional: "",
       telefono: "", correo: "", usuario: "", contrasena: "", consultorio: ""
     });
+  };
+
+  // 4. PUT: Editar Datos del Doctor
+  const handleGuardarEdicion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if(!empleadoAEditar) return;
+
+    try {
+      // Ajusta los nombres de las columnas a como los espera tu API
+      const res = await fetch(`http://localhost:3000/api/doctores/${empleadoAEditar.id_real}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre_doctor: empleadoAEditar.nombre,
+          especialidad: empleadoAEditar.rol,
+          cedula_profesional: empleadoAEditar.cedula_profesional,
+          telefono: empleadoAEditar.telefono,
+          correo: empleadoAEditar.correo,
+          consultorio: empleadoAEditar.consultorio,
+          estado_actual: empleadoAEditar.estado
+        })
+      });
+
+      if(res.ok) {
+        setEmpleadoAEditar(null);
+        fetchEmpleados(); // Recargar la lista
+        alert("Datos actualizados correctamente");
+      } else {
+        const errorData = await res.json();
+        alert("Error: " + errorData.error);
+      }
+    } catch(error) {
+      console.error(error);
+      alert("Ocurrió un error al actualizar");
+    }
   };
 
   const getTabClass = (tabName: string) => {
@@ -159,6 +192,7 @@ export function DirectorioPersonal() {
                   onClick={() => setEmpleadoSeleccionado(empleado)}
                   opciones={[
                     { etiqueta: "Ver Perfil", accion: () => setEmpleadoSeleccionado(empleado) },
+                    { etiqueta: "Editar Datos", accion: () => setEmpleadoAEditar(empleado) }, // <-- NUEVA OPCIÓN AQUI
                     { etiqueta: "Asignar Turno", accion: () => alert(`Asignando turno a ${empleado.nombre}`) },
                     { etiqueta: "Eliminar", accion: () => alert('Ruta de eliminación no configurada en API'), peligro: true }
                   ]}
@@ -249,6 +283,69 @@ export function DirectorioPersonal() {
             <Boton type="submit">Añadir Personal</Boton>
           </div>
         </form>
+      </Modal>
+
+      {/* Modal Edición de Personal (NUEVO) */}
+      <Modal isOpen={!!empleadoAEditar} onClose={() => setEmpleadoAEditar(null)} titulo="Editar Datos del Personal">
+        {empleadoAEditar && (
+          <form onSubmit={handleGuardarEdicion} className="space-y-4">
+            <Input 
+              label="Nombre Completo" 
+              required 
+              value={empleadoAEditar.nombre || ""}
+              onChange={(e) => setEmpleadoAEditar({...empleadoAEditar, nombre: e.target.value})}
+            />
+            <Input 
+              label="Especialidad / Rol" 
+              required 
+              value={empleadoAEditar.rol || ""}
+              onChange={(e) => setEmpleadoAEditar({...empleadoAEditar, rol: e.target.value})}
+            />
+
+            {empleadoAEditar.tipo === 'doctor' && (
+              <div className="grid grid-cols-2 gap-4">
+                <Input 
+                  label="Cédula Profesional" 
+                  value={empleadoAEditar.cedula_profesional || ""}
+                  onChange={(e) => setEmpleadoAEditar({...empleadoAEditar, cedula_profesional: e.target.value})}
+                />
+                <Input 
+                  label="Teléfono" 
+                  value={empleadoAEditar.telefono || ""}
+                  onChange={(e) => setEmpleadoAEditar({...empleadoAEditar, telefono: e.target.value})}
+                />
+                <Input 
+                  label="Correo Electrónico" 
+                  type="email"
+                  value={empleadoAEditar.correo || ""}
+                  onChange={(e) => setEmpleadoAEditar({...empleadoAEditar, correo: e.target.value})}
+                />
+                <Input 
+                  label="Consultorio" 
+                  value={empleadoAEditar.consultorio || ""}
+                  onChange={(e) => setEmpleadoAEditar({...empleadoAEditar, consultorio: e.target.value})}
+                />
+              </div>
+            )}
+
+            <Select 
+              label="Estado Operativo"
+              value={empleadoAEditar.estado || "Disponible"}
+              onChange={(e) => setEmpleadoAEditar({...empleadoAEditar, estado: e.target.value})}
+            >
+              <option value="Disponible">Disponible</option>
+              <option value="En Consulta">En Consulta</option>
+              <option value="En Turno">En Turno</option>
+              <option value="Descanso">Descanso</option>
+              <option value="Ausente">Ausente</option>
+            </Select>
+
+            <div className="pt-4 flex justify-end gap-3">
+              <Boton type="button" variante="secundario" onClick={() => setEmpleadoAEditar(null)}>Cancelar</Boton>
+              <Boton type="submit">Guardar Cambios</Boton>
+            </div>
+          </form>
+        )}
       </Modal>
 
       {/* Modal Detalles del Perfil */}
