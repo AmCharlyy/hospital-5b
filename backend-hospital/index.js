@@ -200,9 +200,10 @@ app.post('/api/pacientes', async (req, res) => {
     const contrasenaHasheada = await bcrypt.hash(contrasena_plana, 10);
 
     const nuevoPaciente = await pool.query(
-      `INSERT INTO pacientes (nombre_paciente, curp, numero_telefono, status, contrasena) 
+      `INSERT INTO pacientes 
+      (nombre_paciente, curp, numero_telefono, edad, sexo, correo, status, contrasena) 
        VALUES ($1, $2, $3, 1, $4) RETURNING *`,
-      [nombre_paciente, curp, numero_telefono, contrasenaHasheada]
+      [nombre_paciente, curp, numero_telefono, edad, sexo, correo, contrasenaHasheada]
     );
 
     res.status(201).json(nuevoPaciente.rows[0]);
@@ -218,34 +219,22 @@ app.post('/api/pacientes', async (req, res) => {
 // --- 10. PACIENTES: Editar datos del paciente ---
 app.put('/api/pacientes/:id', async (req, res) => {
   const { id } = req.params;
-  const { nombre_paciente, curp, numero_telefono } = req.body;
+  // 1. Agregamos edad, sexo y correo a la destructuración
+  const { nombre_paciente, curp, numero_telefono, edad, sexo, correo } = req.body;
 
   try {
+    // 2. Agregamos las columnas al UPDATE de SQL
     await pool.query(
       `UPDATE pacientes 
-       SET nombre_paciente = $1, curp = $2, numero_telefono = $3
-       WHERE id_paciente = $4`,
-      [nombre_paciente, curp, numero_telefono, id]
+       SET nombre_paciente = $1, curp = $2, numero_telefono = $3, edad = $4, sexo = $5, correo = $6
+       WHERE id_paciente = $7`,
+      [nombre_paciente, curp, numero_telefono, edad, sexo, correo, id] // 3. Pasamos los valores
     );
     res.json({ message: "Paciente actualizado correctamente" });
   } catch (error) {
     if (error.code === '23505') {
         return res.status(400).json({ error: "Esa CURP ya está asignada a otro paciente." });
     }
-    console.error(error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// --- 11. PACIENTES: Cambiar estado (Activar/Desactivar) ---
-app.put('/api/pacientes/:id/estado', async (req, res) => {
-  const { id } = req.params;
-  const { id_status } = req.body; 
-
-  try {
-    await pool.query('UPDATE pacientes SET status = $1 WHERE id_paciente = $2', [id_status, id]);
-    res.json({ message: "Estado del paciente actualizado" });
-  } catch (error) {
     console.error(error);
     res.status(500).json({ error: error.message });
   }
