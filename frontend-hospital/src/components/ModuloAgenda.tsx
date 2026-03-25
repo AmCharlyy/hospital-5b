@@ -604,12 +604,17 @@ export function ModuloAgenda() {
             </div>
             
             {modalConfirmacion.accion === 'Cancelar' && (
-              <Input 
-                label="Motivo de cancelación (Opcional)" 
-                placeholder="Ej. Paciente no podrá asistir..." 
-                value={motivoCancelacion}
-                onChange={(e) => setMotivoCancelacion(e.target.value)}
-              />
+              <Select 
+                label="Tipo de Cita" 
+                required 
+                value={nuevaCita.tipo_cita}
+                onChange={(e) => setNuevaCita({...nuevaCita, tipo_cita: e.target.value})}
+              >
+                <option value="Consulta">Consulta</option>
+                <option value="Urgencia">Urgencia</option>
+                <option value="Cirugía">Cirugía</option>
+                <option value="Estudios">Estudios</option>
+              </Select>
             )}
 
             <div className="flex justify-end gap-3 pt-4 border-t border-black/[0.05]">

@@ -188,9 +188,7 @@ app.put('/api/citas/:id/estado', async (req, res) => {
         await pool.query('UPDATE consultorios SET disponible = true WHERE id_consultorio = $1', [citaRes.rows[0].id_consultorio]);
       }
     }
-
-    // 3. OBTENER DATOS PARA EL WHATSAPP
-    // Traemos la información completa cruzando las tablas pacientes, doctores y consultorios
+// 3. OBTENER DATOS PARA EL WHATSAPP
     const datosCita = await pool.query(`
       SELECT p.numero_telefono, p.nombre_paciente, c.hora, 
              TO_CHAR(c.fecha, 'YYYY-MM-DD') as fecha, d.nombre_doctor, con.nombre_consultorio
@@ -203,27 +201,30 @@ app.put('/api/citas/:id/estado', async (req, res) => {
 
     if (datosCita.rows.length > 0) {
       const info = datosCita.rows[0];
-      
-      // Revisando tu BD, algunos números ya tienen el 52 (ej. 524291300408) y otros no.
-      // Si no empieza con 52, se lo agregamos (asumiendo que estás en México).
       let telefono = info.numero_telefono;
-      if (!telefono.startsWith("52")) telefono = "52" + telefono;
+      
+      // RED DE SEGURIDAD: Solo enviamos WhatsApp si hay un teléfono registrado
+      if (telefono) {
+        // Asegurarnos de que sea texto para que no explote la función startsWith
+        telefono = String(telefono); 
+        
+        if (!telefono.startsWith("52")) telefono = "52" + telefono;
 
-      // 4. DISPARAR EL MENSAJE SEGÚN EL ESTADO
-      if (estado === 'Confirmada') {
-        // Variables: {{1}}nombre, {{2}}fecha, {{3}}hora, {{4}}doctor, {{5}}consultorio
-        const vars = [info.nombre_paciente, info.fecha, info.hora, info.nombre_doctor, info.nombre_consultorio || "Por asignar"];
-        enviarWhatsApp(telefono, "cita_confirmada", vars);
-      } 
-      else if (estado === 'Cancelada') {
-        // Variables: {{1}}nombre, {{2}}fecha, {{3}}hora
-        const vars = [info.nombre_paciente, info.fecha, info.hora];
-        enviarWhatsApp(telefono, "cita_cancelada", vars);
-      }
-      else if (estado === 'Rechazada') {
-        // Variables: {{1}}nombre, {{2}}fecha, {{3}}hora, {{4}}doctor
-        const vars = [info.nombre_paciente, info.fecha, info.hora, info.nombre_doctor];
-        enviarWhatsApp(telefono, "cita_rechazada", vars);
+        // 4. DISPARAR EL MENSAJE SEGÚN EL ESTADO
+        if (estado === 'Confirmada') {
+          const vars = [info.nombre_paciente, info.fecha, info.hora, info.nombre_doctor, info.nombre_consultorio || "Por asignar"];
+          enviarWhatsApp(telefono, "cita_confirmada", vars);
+        } 
+        else if (estado === 'Cancelada') {
+          const vars = [info.nombre_paciente, info.fecha, info.hora];
+          enviarWhatsApp(telefono, "cita_cancelada", vars);
+        }
+        else if (estado === 'Rechazada') {
+          const vars = [info.nombre_paciente, info.fecha, info.hora, info.nombre_doctor];
+          enviarWhatsApp(telefono, "cita_rechazada", vars);
+        }
+      } else {
+        console.log("El paciente no tiene número de teléfono registrado. Omitiendo WhatsApp.");
       }
     }
 
@@ -233,6 +234,7 @@ app.put('/api/citas/:id/estado', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
 
 // --- 7. PERSONAL: Añadir nuevo Doctor ---
 app.post('/api/doctores', async (req, res) => {
