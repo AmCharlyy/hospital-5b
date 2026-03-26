@@ -352,6 +352,15 @@ app.delete('/api/habitaciones/:id', async (req, res) => {
   }
 });
 
+//  --- 1.8. Obtener Especialidades
+app.get('/api/especialidades', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id_especialidad, nombre FROM especialidades ORDER BY nombre ASC');
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: 'Error al obtener especialidades' });
+  }
+});
 
 // --- 2. PERSONAL: Doctores (Obtener) ---
 app.get('/api/doctores/estado', async (req, res) => {
@@ -525,7 +534,7 @@ app.put('/api/citas/:id/estado', async (req, res) => {
 
 // --- 7. PERSONAL: Añadir nuevo Doctor ---
 app.post('/api/doctores', async (req, res) => {
-  const { nombre, cedula_profesional, telefono, correo, usuario, contrasena, consultorio } = req.body;
+  const { nombre, cedula_profesional, telefono, correo, usuario, contrasena, consultorio, id_especialidad } = req.body;
   
   if (!nombre || !contrasena) {
     return res.status(400).json({ error: "El nombre es obligatorio." });
@@ -535,9 +544,9 @@ app.post('/api/doctores', async (req, res) => {
     const contrasenaHasheada = await bcrypt.hash(contrasena, 10);
 
     const nuevoDoctor = await pool.query(
-      `INSERT INTO doctores (nombre_doctor, cedula_profesional, telefono, correo, usuario, contrasena, estado) 
-       VALUES ($1, $2, $3, $4, $5, $6, 'Activo') RETURNING *`,
-      [nombre, cedula_profesional, telefono, correo, usuario, contrasenaHasheada]
+      `INSERT INTO doctores (nombre_doctor, cedula_profesional, telefono, correo, usuario, contrasena, estado, consultorio, id_especialidad) 
+       VALUES ($1, $2, $3, $4, $5, $6, 'Disponible', $7, $8) RETURNING *`,
+      [nombre, cedula_profesional, telefono, correo, usuario, contrasenaHasheada, consultorio || null, id_especialidad || null]
     );
     
     res.status(201).json(nuevoDoctor.rows[0]);
@@ -550,14 +559,14 @@ app.post('/api/doctores', async (req, res) => {
 // --- 7.5. PERSONAL: Editar datos del Doctor ---
 app.put('/api/doctores/:id', async (req, res) => {
   const { id } = req.params;
-  const { nombre_doctor, cedula_profesional, telefono, correo } = req.body;
+  const { nombre_doctor, cedula_profesional, telefono, correo, consultorio, estado, id_especialidad } = req.body;
 
   try {
     const result = await pool.query(
       `UPDATE doctores 
-       SET nombre_doctor = $1, cedula_profesional = $2, telefono = $3, correo = $4
-       WHERE id_doctor = $5 RETURNING *`,
-      [nombre_doctor, cedula_profesional, telefono, correo, id]
+       SET nombre_doctor = $1, cedula_profesional = $2, telefono = $3, correo = $4, consultorio = $5, estado = $6, id_especialidad = $7
+       WHERE id_doctor = $8 RETURNING *`,
+      [nombre_doctor, cedula_profesional, telefono, correo, consultorio || null, estado || 'Disponible', id_especialidad || null, id]
     );
 
     if (result.rowCount === 0) {
@@ -661,7 +670,7 @@ app.put('/api/pacientes/:id/baja', async (req, res) => {
   const { id } = req.params;
   
   try {
-    const ID_STATUS_BAJA = 3; 
+    const ID_STATUS_BAJA = 5; 
 
     const result = await pool.query(
       'UPDATE pacientes SET status = $1 WHERE id_paciente = $2 RETURNING *', 

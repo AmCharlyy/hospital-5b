@@ -49,6 +49,7 @@ export function DirectorioPersonal() {
           id_real: doc.id_doctor, // Necesario para el PUT
           nombre: doc.nombre_doctor,
           rol: doc.especialidad || 'General',
+          id_especialidad: doc.id_especialidad || null,
           tipo: 'doctor',
           estado: doc.estado_actual || 'Disponible',
           avatar: iniciales.toUpperCase(),
@@ -89,7 +90,9 @@ export function DirectorioPersonal() {
     try {
       const res = await fetch("http://localhost:3000/api/especialidades");
       const data = await res.json();
-      if (Array.isArray(data)) setEspecialidades(data);
+      
+      setEspecialidades(Array.isArray(data) ? data : []);  
+
     } catch (error) {
       console.error("Error al cargar especialidades");
     }
@@ -176,6 +179,7 @@ export function DirectorioPersonal() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nombre_doctor: empleadoAEditar.nombre,
+          id_especialidad: empleadoAEditar.rol,
           especialidad: empleadoAEditar.rol,
           cedula_profesional: empleadoAEditar.cedula_profesional,
           telefono: empleadoAEditar.telefono,
@@ -256,7 +260,7 @@ export function DirectorioPersonal() {
                   onClick={() => setEmpleadoSeleccionado(empleado)}
                   opciones={[
                     { etiqueta: "Ver Perfil", accion: () => setEmpleadoSeleccionado(empleado) },
-                    { etiqueta: "Editar Datos", accion: () => setEmpleadoAEditar(empleado) },
+                    { etiqueta: "Editar Datos", accion: () => setEmpleadoAEditar({...empleado, rol:empleado.id_especialidad}) },
                     { etiqueta: "Asignar Turno", accion: () => alert(`Asignando turno a ${empleado.nombre}`) },
                     { etiqueta: "Eliminar", accion: () => alert('Ruta de eliminación no configurada en API'), peligro: true }
                   ]}
@@ -281,10 +285,9 @@ export function DirectorioPersonal() {
             value={nuevoEmpleado.nombre}
             onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, nombre: e.target.value })}
           />
-          
+
           <Select 
-            label="Especialidad/ rol" 
-            placeholder="Ej. Medico General"
+            label="Especialidad Médica" 
             required 
             value={nuevoEmpleado.rol}
             onChange={(e) => setNuevoEmpleado({...nuevoEmpleado, rol: e.target.value})}
@@ -295,7 +298,7 @@ export function DirectorioPersonal() {
                 {esp.nombre}
               </option>
             ))}
-          </Select>  
+          </Select>
 
           <Select
             label="Tipo de Personal"
@@ -330,7 +333,7 @@ export function DirectorioPersonal() {
                 onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, correo: e.target.value })}
               />
 
-      {/* Select de Consultorios para Añadir */}
+              {/* Select de Consultorios para Añadir */}
               <Select
                 label="Consultorio"
                 value={nuevoEmpleado.consultorio}
@@ -377,12 +380,19 @@ export function DirectorioPersonal() {
               value={empleadoAEditar.nombre || ""}
               onChange={(e) => setEmpleadoAEditar({ ...empleadoAEditar, nombre: e.target.value })}
             />
-            <Input
+            <Select
               label="Especialidad / Rol"
               required
               value={empleadoAEditar.rol || ""}
               onChange={(e) => setEmpleadoAEditar({ ...empleadoAEditar, rol: e.target.value })}
-            />
+            >
+              <option value="">Seleccione una especialidad...</option>
+              {especialidades.map((esp) => (
+                <option key={esp.id_especialidad} value={esp.id_especialidad}>
+                  {esp.nombre}
+                </option>
+              ))}
+            </Select>
 
             {empleadoAEditar.tipo === 'doctor' && (
               <div className="grid grid-cols-2 gap-4">
@@ -403,7 +413,7 @@ export function DirectorioPersonal() {
                   onChange={(e) => setEmpleadoAEditar({ ...empleadoAEditar, correo: e.target.value })}
                 />
 
-    {/*Select de Consultorios para Editar */}
+                {/*Select de Consultorios para Editar */}
                 <Select
                   label="Consultorio"
                   value={empleadoAEditar.consultorio || ""}
@@ -455,10 +465,10 @@ export function DirectorioPersonal() {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-[#86868b]">Estado Actual</span>
                 <span className={`text-xs font-semibold uppercase tracking-wider px-2 py-1 rounded-md ${empleadoSeleccionado.estado === 'En Turno' ? 'bg-green-100 text-green-700' :
-                    empleadoSeleccionado.estado === 'En Consulta' ? 'bg-blue-100 text-blue-700' :
-                      empleadoSeleccionado.estado === 'Disponible' ? 'bg-green-100 text-green-700' :
-                        empleadoSeleccionado.estado === 'En Ruta' ? 'bg-orange-100 text-orange-700' :
-                          'bg-gray-100 text-gray-600'
+                  empleadoSeleccionado.estado === 'En Consulta' ? 'bg-blue-100 text-blue-700' :
+                    empleadoSeleccionado.estado === 'Disponible' ? 'bg-green-100 text-green-700' :
+                      empleadoSeleccionado.estado === 'En Ruta' ? 'bg-orange-100 text-orange-700' :
+                        'bg-gray-100 text-gray-600'
                   }`}>
                   {empleadoSeleccionado.estado}
                 </span>
