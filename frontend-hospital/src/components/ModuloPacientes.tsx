@@ -326,6 +326,7 @@ export function ModuloPacientes() {
               value={nuevoPaciente.edad || ""}
               onChange={(e) => setNuevoPaciente({...nuevoPaciente, edad: parseInt(e.target.value) || 0})}
             />
+            
             {/*Modulo NuevoPaciente*/}
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-[#1d1d1f]">Sexo</label>

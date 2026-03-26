@@ -134,7 +134,6 @@ export function ModuloAgenda() {
     setCitaSeleccionada(null);
   };
 
-
   const handleIniciarConsulta = () => {
     if (!citaSeleccionada) return;
     actualizarEstadoEnAPI(citaSeleccionada.id_cita, "En Curso");
