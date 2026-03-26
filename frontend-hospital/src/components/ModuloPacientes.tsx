@@ -17,15 +17,8 @@ export function ModuloPacientes() {
   
   const [credencialesGeneradas, setCredencialesGeneradas] = useState({ curp: "", contrasena: "", telefono: "", nombre: "" });
   
-  // Estado inicial completo para el registro
   const [nuevoPaciente, setNuevoPaciente] = useState({ 
-    nombre_paciente: "", 
-    curp: "", 
-    codigo_pais: "+52", 
-    numero_telefono: "", 
-    sexo: "", 
-    correo: "", 
-    edad: 0 
+    nombre_paciente: "", curp: "", codigo_pais: "+52", numero_telefono: "", sexo: "", correo: "", edad: 0 
   });
 
   const generarContrasena = () => {
@@ -66,9 +59,7 @@ export function ModuloPacientes() {
         body: JSON.stringify({
           nombre_paciente: nuevoPaciente.nombre_paciente,
           curp: nuevoPaciente.curp,
-          numero_telefono: nuevoPaciente.numero_telefono, // Si tu backend solo guarda el numero
-          // Opcionalmente, si decides añadir estas columnas a tu BD en el futuro:
-          // codigo_pais: nuevoPaciente.codigo_pais,
+          numero_telefono: nuevoPaciente.numero_telefono,
           edad: nuevoPaciente.edad,
           sexo: nuevoPaciente.sexo,
           correo: nuevoPaciente.correo,
@@ -113,8 +104,6 @@ export function ModuloPacientes() {
           nombre_paciente: pacienteAEditar.nombre_paciente,
           curp: pacienteAEditar.curp,
           numero_telefono: pacienteAEditar.numero_telefono,
-          // Si añades más columnas al PUT de tu backend:
-          // codigo_pais: pacienteAEditar.codigo_pais,
           correo: pacienteAEditar.correo,
           edad: pacienteAEditar.edad || 0,
           sexo: pacienteAEditar.sexo || "Masculino"
@@ -134,11 +123,8 @@ export function ModuloPacientes() {
     }
   };
 
-  // --- 3. PUT: Cambiar Estado Lógico ---
-  const toggleEstadoPaciente = async (pacienteId: string, estadoActual: string) => {
-    const esActivo = estadoActual === 'ACTIVO' || estadoActual === 'ALTA';
-    const nuevoIdStatus = esActivo ? 2 : 1; 
-
+  // --- 3. PUT: Cambiar Estado Lógico (Dar de Alta) ---
+  const cambiarEstadoPaciente = async (pacienteId: string, nuevoIdStatus: number) => {
     try {
       const res = await fetch(`http://localhost:3000/api/pacientes/${pacienteId}/estado`, {
         method: 'PUT',
@@ -152,10 +138,9 @@ export function ModuloPacientes() {
     }
   };
 
-  // --- 4. PUT: Generar y Guardar Nueva Contraseña ---
+  // --- 4. PUT: Generar Nueva Contraseña ---
   const handleNuevaContrasena = async (paciente: any) => {
     const nuevaContrasena = generarContrasena();
-    
     try {
       const res = await fetch(`http://localhost:3000/api/pacientes/${paciente.id_paciente}/password`, {
         method: 'PUT',
@@ -165,10 +150,8 @@ export function ModuloPacientes() {
 
       if(res.ok) {
         setCredencialesGeneradas({ 
-          curp: paciente.curp, 
-          contrasena: nuevaContrasena,
-          telefono: `${paciente.codigo_pais || '+52'}${paciente.numero_telefono}`,
-          nombre: paciente.nombre_paciente
+          curp: paciente.curp, contrasena: nuevaContrasena,
+          telefono: `${paciente.codigo_pais || '+52'}${paciente.numero_telefono}`, nombre: paciente.nombre_paciente
         });
         setModalCredenciales(true);
       } else {
@@ -179,31 +162,39 @@ export function ModuloPacientes() {
     }
   };
 
+  // Función auxiliar para los colores del estado
+  const colorEstado = (estado: string) => {
+    switch(estado) {
+      case 'EN ESPERA': return 'bg-yellow-100 text-yellow-700';
+      case 'PRECITA': return 'bg-blue-100 text-blue-700';
+      case 'ATENCIÓN MÉDICA': return 'bg-purple-100 text-purple-700';
+      case 'DADO DE ALTA': return 'bg-green-100 text-green-700';
+      case 'CANCELADA':
+      case 'RECHAZADA': return 'bg-red-100 text-red-700';
+      default: return 'bg-gray-100 text-gray-600';
+    }
+  };
+
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
+      {/* HEADER: (Se mantiene igual, resumido por espacio) */}
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight text-[#1d1d1f]">Pacientes</h1>
-          <p className="text-[#86868b] mt-1">Registro de usuarios, expedientes y accesos al sistema.</p>
+          <p className="text-[#86868b] mt-1">Gestión de flujo, expedientes y accesos.</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="relative">
             <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-[#86868b]" />
-            <input 
-              type="text" 
-              placeholder="Buscar por CURP o nombre..." 
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              className="pl-10 pr-4 py-2.5 bg-white rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 border border-black/[0.05] shadow-sm w-64"
-            />
+            <input type="text" placeholder="Buscar por CURP o nombre..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} className="pl-10 pr-4 py-2.5 bg-white rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 border border-black/[0.05] shadow-sm w-64" />
           </div>
           <Boton onClick={() => setModalAbierto(true)}>
-            <Plus className="w-5 h-5" />
-            Registrar Paciente
+            <Plus className="w-5 h-5" /> Registrar Paciente
           </Boton>
         </div>
       </header>
 
+      {/* TABLA DE PACIENTES */}
       <div className="bg-white rounded-3xl shadow-[0_2px_20px_rgba(0,0,0,0.02)] border border-black/[0.02] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -212,21 +203,21 @@ export function ModuloPacientes() {
                 <th className="px-6 py-4 text-xs font-semibold text-[#86868b] uppercase tracking-wider">Folio / Nombre</th>
                 <th className="px-6 py-4 text-xs font-semibold text-[#86868b] uppercase tracking-wider">CURP (Usuario)</th>
                 <th className="px-6 py-4 text-xs font-semibold text-[#86868b] uppercase tracking-wider">Contacto</th>
-                <th className="px-6 py-4 text-xs font-semibold text-[#86868b] uppercase tracking-wider">Estado</th>
+                <th className="px-6 py-4 text-xs font-semibold text-[#86868b] uppercase tracking-wider">Flujo Actual</th>
                 <th className="px-6 py-4 text-xs font-semibold text-[#86868b] uppercase tracking-wider text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-black/[0.05]">
               {pacientesFiltrados.map((paciente) => {
-                const estadoVisual = paciente.estado ? paciente.estado.toUpperCase() : 'ACTIVO';
-                const esActivo = estadoVisual === 'ACTIVO' || estadoVisual === 'ALTA'; 
+                // Parseamos el estado. Si viene vacío, por defecto es EN ESPERA.
+                const estadoVisual = paciente.estado ? paciente.estado.toUpperCase() : 'EN ESPERA';
                 
                 return (
                   <tr key={paciente.id_paciente} className="hover:bg-gray-50/50 transition-colors group">
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
                         <span className="font-semibold text-[#1d1d1f]">{paciente.nombre_paciente}</span>
-                        <span className="text-xs text-[#86868b]">Folio: {paciente.folio || `P-${paciente.id_paciente}`}</span>
+                        <span className="text-xs text-[#86868b]">Folio: P-{paciente.id_paciente}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -237,9 +228,8 @@ export function ModuloPacientes() {
                     </td>
                     <td className="px-6 py-4 text-sm text-[#1d1d1f]">{paciente.codigo_pais || '+52'} {paciente.numero_telefono}</td>
                     <td className="px-6 py-4">
-                      <span className={`text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md ${
-                        esActivo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-                      }`}>
+                      {/* ESTADO CON COLOR DINÁMICO */}
+                      <span className={`text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md ${colorEstado(estadoVisual)}`}>
                         {estadoVisual}
                       </span>
                     </td>
@@ -249,12 +239,15 @@ export function ModuloPacientes() {
                           { etiqueta: "Ver Expediente", accion: () => setPacienteSeleccionado(paciente) },
                           { etiqueta: "Editar Datos", accion: () => setPacienteAEditar(paciente) },
                           { etiqueta: "Generar Nueva Contraseña", accion: () => handleNuevaContrasena(paciente) },
-                          { 
-                            etiqueta: esActivo ? "Desactivar" : "Activar", 
-                            accion: () => toggleEstadoPaciente(paciente.id_paciente, estadoVisual), 
-                            peligro: esActivo 
-                          }
-                        ]}
+                          // Si el paciente está en Atención, mostramos el botón de Dar de Alta. 
+                          // NOTA: Asumiendo que "Dado de Alta" tiene el ID 5 en tu base de datos (ajústalo a tu tabla)
+                          estadoVisual === 'ATENCIÓN MÉDICA' 
+                            ? { etiqueta: "Dar de Alta", accion: () => cambiarEstadoPaciente(paciente.id_paciente, 5), peligro: false }
+                            : null,
+                          estadoVisual === 'DADO DE ALTA' || estadoVisual === 'CANCELADA' || estadoVisual === 'RECHAZADA'
+                            ? { etiqueta: "Reingresar (Espera)", accion: () => cambiarEstadoPaciente(paciente.id_paciente, 1), peligro: false }
+                            : null
+                        ].filter(Boolean) as any} // Filtramos los nulls
                       />
                     </td>
                   </tr>
@@ -271,7 +264,6 @@ export function ModuloPacientes() {
           </table>
         </div>
       </div>
-
       {/* Modal Registro */}
       <Modal isOpen={modalAbierto} onClose={() => setModalAbierto(false)} titulo="Registrar Nuevo Paciente">
         <form onSubmit={handleRegistrarPaciente} className="space-y-4">

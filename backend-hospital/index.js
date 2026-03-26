@@ -385,15 +385,16 @@ app.get('/api/doctores/estado', async (req, res) => {
   }
 });
 
-// --- 3. PACIENTES (Obtener) ---
+// --- 3. PACIENTES (Obtener completo con nuevo flujo) ---
 app.get('/api/pacientes/completo', async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT p.id_paciente, p.nombre_paciente, p.curp, p.numero_telefono, 
-             p.edad, p.sexo, p.correo, s.status as estado, p.num_expediente,
+             p.edad, p.sexo, p.correo, 
+             efp.nombre_estado as estado, -- 🚨 Lee el nombre de TU nueva tabla
              TO_CHAR(p.fecha_registro, 'DD-MM-YYYY') as fecha_registro
       FROM pacientes p 
-      LEFT JOIN status s ON p.status = s.id_status
+      LEFT JOIN estado_flujo_paciente efp ON p.status = efp.id_estado -- 🚨 Conecta con TU tabla
       ORDER BY p.id_paciente DESC
     `);
     res.json(result.rows);
@@ -453,6 +454,9 @@ app.post('/api/citas', async (req, res) => {
     if (id_consultorio) {
       await pool.query('UPDATE consultorios SET disponible = false WHERE id_consultorio = $1', [id_consultorio]);
     }
+
+ 
+    await pool.query('UPDATE pacientes SET status = 2 WHERE id_paciente = $1', [id_paciente]);
 
     res.json(nuevaCita.rows[0]);
   } catch (error) {
