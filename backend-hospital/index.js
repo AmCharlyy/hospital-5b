@@ -15,7 +15,6 @@ async function enviarWhatsApp(telefono, nombrePlantilla, variables, idioma = "es
   const WA_PHONE_ID = process.env.WA_PHONE_ID;
   const WA_TOKEN = process.env.WA_TOKEN;
 
-  // Formatear las variables para la API de Meta
   const parameters = variables.map(text => ({ type: "text", text: String(text) }));
 
   const data = {
@@ -34,7 +33,6 @@ async function enviarWhatsApp(telefono, nombrePlantilla, variables, idioma = "es
     }
   };
 
-  // 🚨 EL CHISMOSO:
   console.log("----------------------------------------");
   console.log("📢 ENVIANDO WHATSAPP A:", telefono);
   console.log("📢 LARGO DEL NÚMERO:", telefono.length, "dígitos");
@@ -58,15 +56,27 @@ async function enviarWhatsApp(telefono, nombrePlantilla, variables, idioma = "es
   }
 }
 
-// --- 1. INFRAESTRUCTURA ---
+// ==========================================
+// --- 1. INFRAESTRUCTURA (Consultorios) ---
+// ==========================================
+
+// Obtener todos los consultorios (Completo)
 app.get('/api/consultorios', async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT id_consultorio as id_ui, nombre_consultorio as nombre, 
-      CASE WHEN disponible = true THEN 'disponible' ELSE 'ocupada' END as estado, 
-      'Consultorio' as tipo 
+      SELECT 
+        id_consultorio as id_ui, 
+        nombre_consultorio as nombre, 
+        id_consultorio, 
+        nombre_consultorio, 
+        piso, 
+        edificio, 
+        disponible, 
+        id_area,
+        CASE WHEN disponible = true THEN 'disponible' ELSE 'ocupada' END as estado, 
+        'Consultorio' as tipo 
       FROM consultorios
-      ORDER BY id_consultorio
+      ORDER BY id_consultorio DESC
     `);
     res.json(result.rows);
   } catch (error) {
@@ -75,7 +85,7 @@ app.get('/api/consultorios', async (req, res) => {
   }
 });
 
-// --- 1.5 NUEVO: Consultorios Disponibles para los Menús Desplegables ---
+// Obtener solo disponibles
 app.get('/api/consultorios-disponibles', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -91,15 +101,257 @@ app.get('/api/consultorios-disponibles', async (req, res) => {
   }
 });
 
-// --- 1.8. Obtener Especialidades
-app.get('/api/especialidades', async (req, res) => {
+// Crear consultorio
+app.post('/api/consultorios', async (req, res) => {
+  const { nombre_consultorio, piso, edificio, id_area } = req.body;
+  if (!nombre_consultorio) return res.status(400).json({ error: "El nombre del consultorio es obligatorio" });
+
   try {
-    const result = await pool.query('SELECT id_especialidad, nombre FROM especialidades ORDER BY nombre ASC');
-    res.json(result.rows);
+    const result = await pool.query(
+      `INSERT INTO consultorios (nombre_consultorio, piso, edificio, disponible, id_area) 
+       VALUES ($1, $2, $3, true, $4) RETURNING *`,
+      [nombre_consultorio, piso || null, edificio || 'Principal', id_area || null]
+    );
+    res.status(201).json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({ error: 'Error al obtener especialidades' });
+    console.error("Error al crear consultorio:", error);
+    res.status(500).json({ error: error.message });
   }
 });
+
+// Editar consultorio
+app.put('/api/consultorios/:id', async (req, res) => {
+  const { id } = req.params;
+  const { nombre_consultorio, piso, edificio, id_area } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE consultorios 
+       SET nombre_consultorio = $1, piso = $2, edificio = $3, id_area = $4 
+       WHERE id_consultorio = $5 RETURNING *`,
+      [nombre_consultorio, piso, edificio, id_area, id]
+    );
+
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Consultorio no encontrado' });
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error al actualizar consultorio:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Cambiar estado disponibilidad consultorio
+app.put('/api/consultorios/:id/estado', async (req, res) => {
+  const { id } = req.params;
+  const { disponible } = req.body; 
+
+  try {
+    await pool.query('UPDATE consultorios SET disponible = $1 WHERE id_consultorio = $2', [disponible, id]);
+    res.json({ message: "Disponibilidad actualizada" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Eliminar consultorio
+app.delete('/api/consultorios/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query(`DELETE FROM consultorios WHERE id_consultorio = $1`, [id]);
+    res.json({ message: "Consultorio eliminado exitosamente" });
+  } catch (error) {
+    console.error("Error al eliminar consultorio:", error);
+    res.status(500).json({ error: "No se puede eliminar porque tiene citas o datos enlazados." });
+  }
+});
+
+// --- 1.6 AUXILIARES ---
+(async function ensureAuxiliaresTable() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS auxiliares (
+        id_auxiliar SERIAL PRIMARY KEY,
+        nombre TEXT NOT NULL,
+        apellido TEXT NOT NULL,
+        tipo_auxiliar TEXT NOT NULL,
+        turno TEXT NOT NULL
+      );
+    `);
+    console.log('Tabla auxiliares verificada');
+  } catch (error) {
+    console.error('Error al crear/verificar la tabla auxiliares:', error);
+  }
+})();
+
+app.get('/api/auxiliares', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id_auxiliar, nombre, apellido, tipo_auxiliar, turno
+      FROM auxiliares
+      ORDER BY id_auxiliar ASC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al obtener auxiliares' });
+  }
+});
+
+app.post('/api/auxiliares', async (req, res) => {
+  const { nombre, apellido, tipo_auxiliar, turno } = req.body;
+  if (!nombre || !apellido || !tipo_auxiliar || !turno) {
+    return res.status(400).json({ error: 'Faltan datos obligatorios de auxiliar' });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO auxiliares (nombre, apellido, tipo_auxiliar, turno) VALUES ($1, $2, $3, $4) RETURNING *`,
+      [nombre, apellido, tipo_auxiliar, turno]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al crear auxiliar' });
+  }
+});
+
+app.put('/api/auxiliares/:id', async (req, res) => {
+  const { id } = req.params;
+  const { nombre, apellido, tipo_auxiliar, turno } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE auxiliares SET nombre = $1, apellido = $2, tipo_auxiliar = $3, turno = $4 WHERE id_auxiliar = $5 RETURNING *`,
+      [nombre, apellido, tipo_auxiliar, turno, id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Auxiliar no encontrado' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al actualizar auxiliar' });
+  }
+});
+
+app.delete('/api/auxiliares/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query('DELETE FROM auxiliares WHERE id_auxiliar = $1', [id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Auxiliar no encontrado' });
+    }
+    res.json({ message: 'Auxiliar eliminado correctamente' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al eliminar auxiliar' });
+  }
+});
+
+// ==========================================
+// --- 1.7 INFRAESTRUCTURA (Habitaciones) ---
+// ==========================================
+
+// Obtener todas las habitaciones
+app.get('/api/habitaciones', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT * FROM habitaciones 
+      ORDER BY piso ASC, numero_habitacion ASC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error al obtener habitaciones:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Obtener solo habitaciones disponibles
+app.get('/api/habitaciones-disponibles', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT * FROM habitaciones 
+      WHERE estado = 'Disponible' 
+      ORDER BY piso ASC, numero_habitacion ASC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error al obtener habitaciones disponibles:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Crear nueva habitación
+app.post('/api/habitaciones', async (req, res) => {
+  const { numero_habitacion, piso, tipo_habitacion, costo_dia } = req.body;
+  
+  if (!numero_habitacion || !piso || !tipo_habitacion) {
+    return res.status(400).json({ error: "Faltan datos obligatorios de la habitación." });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO habitaciones (numero_habitacion, piso, tipo_habitacion, estado, costo_dia) 
+       VALUES ($1, $2, $3, 'Disponible', $4) RETURNING *`,
+      [numero_habitacion, piso, tipo_habitacion, costo_dia || 0]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error("Error al crear habitación:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Editar habitación
+app.put('/api/habitaciones/:id', async (req, res) => {
+  const { id } = req.params;
+  const { numero_habitacion, piso, tipo_habitacion, costo_dia } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE habitaciones 
+       SET numero_habitacion = $1, piso = $2, tipo_habitacion = $3, costo_dia = $4 
+       WHERE id_habitacion = $5 RETURNING *`,
+      [numero_habitacion, piso, tipo_habitacion, costo_dia, id]
+    );
+    
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Habitación no encontrada' });
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error al actualizar habitación:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Cambiar estado de la habitación (Disponible, Ocupada, Mantenimiento)
+app.put('/api/habitaciones/:id/estado', async (req, res) => {
+  const { id } = req.params;
+  const { estado } = req.body; 
+
+  try {
+    await pool.query('UPDATE habitaciones SET estado = $1 WHERE id_habitacion = $2', [estado, id]);
+    res.json({ message: `Estado de la habitación actualizado a ${estado}` });
+  } catch (error) {
+    console.error("Error al cambiar estado de habitación:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Eliminar habitación
+app.delete('/api/habitaciones/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('DELETE FROM habitaciones WHERE id_habitacion = $1', [id]);
+    res.json({ message: "Habitación eliminada exitosamente" });
+  } catch (error) {
+    console.error("Error al eliminar habitación:", error);
+    res.status(500).json({ error: "No se puede eliminar la habitación si hay pacientes asignados a ella." });
+  }
+});
+
 
 // --- 2. PERSONAL: Doctores (Obtener) ---
 app.get('/api/doctores/estado', async (req, res) => {
@@ -107,8 +359,8 @@ app.get('/api/doctores/estado', async (req, res) => {
     const query = `
       SELECT d.id_doctor, d.nombre_doctor, e.nombre as especialidad,
              d.cedula_profesional, d.telefono, d.correo, d.usuario,
-             d.consultorio, -- Columna real de tu tabla doctores
-             con.nombre_consultorio as nombre_consultorio_asignado, -- Para mostrar el nombre si quieres
+             d.consultorio, 
+             con.nombre_consultorio as nombre_consultorio_asignado, 
         CASE 
           WHEN EXISTS (
             SELECT 1 FROM citas c 
@@ -122,7 +374,7 @@ app.get('/api/doctores/estado', async (req, res) => {
         END as estado_actual
       FROM doctores d
       LEFT JOIN especialidades e ON d.id_especialidad = e.id_especialidad
-      LEFT JOIN consultorios con ON d.consultorio = con.id_consultorio -- Unimos correctamente
+      LEFT JOIN consultorios con ON d.consultorio = con.id_consultorio 
       WHERE d.estado != 'Inactivo' 
     `;
     const result = await pool.query(query);
@@ -138,7 +390,7 @@ app.get('/api/pacientes/completo', async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT p.id_paciente, p.nombre_paciente, p.curp, p.numero_telefono, 
-             p.edad, p.sexo, p.correo, s.status as estado,
+             p.edad, p.sexo, p.correo, s.status as estado, p.num_expediente,
              TO_CHAR(p.fecha_registro, 'DD-MM-YYYY') as fecha_registro
       FROM pacientes p 
       LEFT JOIN status s ON p.status = s.id_status
@@ -209,16 +461,14 @@ app.post('/api/citas', async (req, res) => {
   }
 });
 
-// 6. --- AGENDA: Finalizar, Cancelar o Confirmar cita y avisar por WhatsApp ---
+// --- 6. AGENDA: Finalizar, Cancelar o Confirmar cita y avisar por WhatsApp ---
 app.put('/api/citas/:id/estado', async (req, res) => {
   const { id } = req.params;
   const { estado } = req.body;
   
   try {
-    // 1. Actualizar el estado en la BD
     await pool.query('UPDATE citas SET estado = $1 WHERE id_cita = $2', [estado, id]);
     
-    // 2. Liberar consultorio si se finaliza o cancela
     if (estado === 'Cancelada' || estado === 'Finalizada' || estado === 'Rechazada') {
       const citaRes = await pool.query('SELECT id_consultorio FROM citas WHERE id_cita = $1', [id]);
       if (citaRes.rows.length > 0 && citaRes.rows[0].id_consultorio) {
@@ -226,7 +476,6 @@ app.put('/api/citas/:id/estado', async (req, res) => {
       }
     }
 
-    //OBTENER DATOS PARA EL WHATSAPP
     const datosCita = await pool.query(`
       SELECT p.numero_telefono, p.nombre_paciente, c.hora, 
              TO_CHAR(c.fecha, 'YYYY-MM-DD') as fecha, d.nombre_doctor, con.nombre_consultorio
@@ -240,19 +489,14 @@ app.put('/api/citas/:id/estado', async (req, res) => {
     if (datosCita.rows.length > 0) {
       const info = datosCita.rows[0];
       
-      // ✅ AHORA SÍ: Tomamos el número real directo de la base de datos
       let telefono = info.numero_telefono; 
       
       if (telefono) {
         telefono = String(telefono); 
-        
-        // Volvemos a activar la regla para que le agregue el código de país si le falta
-        // (Si tu número funcionó mejor agregándole "521" en lugar de "52", cámbialo aquí)
         if (!telefono.startsWith("52")) {
           telefono = "52" + telefono; 
         }
 
-        //DISPARAR EL MENSAJE SEGÚN EL ESTADO
         if (estado === 'Confirmada') {
           const vars = [info.nombre_paciente, info.fecha, info.hora, info.nombre_doctor, info.nombre_consultorio || "Por asignar"];
           enviarWhatsApp(telefono, "confirmacion", vars);
@@ -277,21 +521,19 @@ app.put('/api/citas/:id/estado', async (req, res) => {
 
 // --- 7. PERSONAL: Añadir nuevo Doctor ---
 app.post('/api/doctores', async (req, res) => {
-
-  // Ahora recibimos 'consultorio' desde el frontend
-  const { nombre, cedula_profesional, telefono, correo, usuario, contrasena, consultorio, id_especialidad} = req.body;
+  const { nombre, cedula_profesional, telefono, correo, usuario, contrasena, consultorio } = req.body;
   
   if (!nombre || !contrasena) {
-    return res.status(400).json({ error: "Campos obligatorios faltantes." });
+    return res.status(400).json({ error: "El nombre es obligatorio." });
   }
 
   try {
     const contrasenaHasheada = await bcrypt.hash(contrasena, 10);
 
     const nuevoDoctor = await pool.query(
-      `INSERT INTO doctores (nombre_doctor, cedula_profesional, telefono, correo, usuario, contrasena, estado, consultorio, id_especialidad) 
-       VALUES ($1, $2, $3, $4, $5, $6, 'Disponible', $7, $8) RETURNING *`,
-      [nombre, cedula_profesional, telefono, correo, usuario, contrasenaHasheada, consultorio || null, id_especialidad || null]
+      `INSERT INTO doctores (nombre_doctor, cedula_profesional, telefono, correo, usuario, contrasena, estado) 
+       VALUES ($1, $2, $3, $4, $5, $6, 'Activo') RETURNING *`,
+      [nombre, cedula_profesional, telefono, correo, usuario, contrasenaHasheada]
     );
     
     res.status(201).json(nuevoDoctor.rows[0]);
@@ -301,29 +543,39 @@ app.post('/api/doctores', async (req, res) => {
   }
 });
 
-// --- 7.5. PERSONAL: Editar datos del Doctor (¡NUEVO!) ---
+// --- 7.5. PERSONAL: Editar datos del Doctor ---
 app.put('/api/doctores/:id', async (req, res) => {
   const { id } = req.params;
-  const { nombre_doctor, cedula_profesional, telefono, correo, consultorio, estado_actual } = req.body;
+  const { nombre_doctor, cedula_profesional, telefono, correo } = req.body;
 
   try {
     const result = await pool.query(
       `UPDATE doctores 
-       SET nombre_doctor = $1, cedula_profesional = $2, telefono = $3, correo = $4, consultorio = $5, estado = $6
-       WHERE id_doctor = $7`,
-      [nombre_doctor, cedula_profesional, telefono, correo, consultorio || null, estado_actual || 'Disponible', id]
+       SET nombre_doctor = $1, cedula_profesional = $2, telefono = $3, correo = $4
+       WHERE id_doctor = $5 RETURNING *`,
+      [nombre_doctor, cedula_profesional, telefono, correo, id]
     );
 
     if (result.rowCount === 0) {
-      return res.status(404).json({ error: "No encontramos al paciente. Quizás ya se dio de alta por su cuenta." });
+      return res.status(404).json({ error: "Doctor no encontrado." });
     }
 
-    res.json({ 
-      message: "Paciente enviado al archivo muerto con éxito. Ya no aparecerá en las listas activas, pero sus secretos (médicos) están a salvo con nosotros." 
-    });
+    res.json({ message: "Datos del doctor actualizados correctamente" });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Fallo en el servidor al intentar procesar la baja." });
+    res.status(500).json({ error: "Error interno del servidor al actualizar al doctor." });
+  }
+});
+
+// --- 8. PERSONAL: Eliminar Doctor ---
+app.delete('/api/doctores/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query("UPDATE doctores SET estado = 'Inactivo' WHERE id_doctor = $1", [id]);
+    res.json({ message: "Doctor dado de baja exitosamente" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -345,17 +597,12 @@ app.post('/api/pacientes', async (req, res) => {
       [nombre_paciente, curp, numero_telefono, edad, sexo, correo, contrasenaHasheada]
     );
 
-    // 🚨 DISPARAR WHATSAPP DE "BIENVENIDA" (Hack de Cita)
     let telPaciente = numero_telefono;
     if (telPaciente) {
       telPaciente = String(telPaciente);
-      // Asegurarnos de que tenga el código de país
       if (!telPaciente.startsWith("52")) telPaciente = "52" + telPaciente;
 
-      // Variables: {{1}} Nombre, {{2}} CURP, {{3}} Contraseña plana
       const varsPaciente = [nombre_paciente, curp, contrasena_plana];
-      
-      // ⚠️ IMPORTANTE: Cambia "nombre_de_tu_plantilla" por el nombre exacto que le pusiste en Meta
       enviarWhatsApp(telPaciente, "bienvenida_paciente", varsPaciente, "es"); 
     }
 
@@ -405,14 +652,12 @@ app.put('/api/pacientes/:id/estado', async (req, res) => {
   }
 });
 
-// --- 12. PACIENTES: Dar de baja (Soft Delete / Cambio de Estado) ---
+// --- 12. PACIENTES: Dar de baja ---
 app.put('/api/pacientes/:id/baja', async (req, res) => {
   const { id } = req.params;
   
   try {
-
-    // Definimos que el ID 3 es 'DADO DE BAJA' en tu tabla 'status'
-    const ID_STATUS_BAJA = 5; 
+    const ID_STATUS_BAJA = 3; 
 
     const result = await pool.query(
       'UPDATE pacientes SET status = $1 WHERE id_paciente = $2 RETURNING *', 
@@ -428,7 +673,7 @@ app.put('/api/pacientes/:id/baja', async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "fallo en el servidor al intentar procesar la baja." });
+    res.status(500).json({ error: "Fallo multiorgánico en el servidor al intentar procesar la baja." });
   }
 });
 
