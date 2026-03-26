@@ -263,7 +263,7 @@ app.post('/api/doctores', async (req, res) => {
   }
 });
 
-// --- 7.5. PERSONAL: Editar datos del Doctor (¡NUEVO!) ---
+// --- 7A. PERSONAL: Editar datos del Doctor (¡NUEVO!) ---
 app.put('/api/doctores/:id', async (req, res) => {
   const { id } = req.params;
   const { nombre_doctor, cedula_profesional, telefono, correo } = req.body;
@@ -279,6 +279,31 @@ app.put('/api/doctores/:id', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// --- 7B. PESONAL: Resetear contraseña de un Doctor ---
+app.put('/api/doctores/:id/password', async (req, res) => {
+  const { id } = req.params;
+  const { nueva_contrasena } = req.body;
+
+  if(!nueva_contrasena) return res.status(400).json({ error: "No puedes dejar al doctor sin llave, manda la nueva contraseña." });
+
+  try {
+    // Licuamos la nueva contraseña
+    const contrasenaHasheada = await bcrypt.hash(nueva_contrasena, 10);
+    
+    const result = await pool.query(
+      'UPDATE doctores SET contrasena = $1 WHERE id_doctor = $2', 
+      [contrasenaHasheada, id]
+    );
+
+    if (result.rowCount === 0) return res.status(404).json({ error: "Ese doctor no existe, ¿seguro que no es un camillero disfrazado?" });
+
+    res.json({ message: "Contraseña actualizada. Avísele al doctor que use una que no sea '123456'." });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error interno del servidor. El servidor está en coma." });
   }
 });
 
@@ -306,11 +331,10 @@ app.post('/api/pacientes', async (req, res) => {
   try {
     const contrasenaHasheada = await bcrypt.hash(contrasena_plana, 10);
 
-    // 2. CORRECCIÓN: Ajustamos los VALUES para que sean 7 variables ($1 al $7)
     const nuevoPaciente = await pool.query(
       `INSERT INTO pacientes 
-      (nombre_paciente, curp, numero_telefono, edad, sexo, correo, status, contrasena) 
-       VALUES ($1, $2, $3, $4, $5, $6, 1, $7) RETURNING *`,
+      (nombre_paciente, curp, numero_telefono, edad, sexo, correo, status, contrasena, num_expediente) 
+       VALUES ($1, $2, $3, $4, $5, $6, 1, $7, (SELECT COALESCE(MAX(num_expediente), 0) + 1 FROM pacientes)) RETURNING *`,
       [nombre_paciente, curp, numero_telefono, edad, sexo, correo, contrasenaHasheada]
     );
 
@@ -362,7 +386,33 @@ app.put('/api/pacientes/:id/estado', async (req, res) => {
   }
 });
 
-// --- 12. PACIENTES: Generar nueva contraseña ---
+// --- 12. PACIENTES: Dar de baja (Soft Delete / Cambio de Estado) ---
+app.put('/api/pacientes/:id/baja', async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    // Definimos que el ID 3 es 'DADO DE BAJA' en tu tabla 'status'
+    const ID_STATUS_BAJA = 3; 
+
+    const result = await pool.query(
+      'UPDATE pacientes SET status = $1 WHERE id_paciente = $2 RETURNING *', 
+      [ID_STATUS_BAJA, id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "No encontramos al paciente. Quizás ya se dio de alta por su cuenta." });
+    }
+
+    res.json({ 
+      message: "Paciente enviado al archivo muerto con éxito. Ya no aparecerá en las listas activas, pero sus secretos (médicos) están a salvo con nosotros." 
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Fallo multiorgánico en el servidor al intentar procesar la baja." });
+  }
+});
+
+// --- 13. PACIENTES: Generar nueva contraseña ---
 app.put('/api/pacientes/:id/password', async (req, res) => {
   const { id } = req.params;
   const { contrasena_plana } = req.body;
