@@ -270,34 +270,29 @@ app.post('/api/doctores', async (req, res) => {
   }
 });
 
-// --- 7.5. PERSONAL: Editar datos del Doctor ---
-app.put('/api/doctores/:id', async (req, res) => {
+// --- 8. PACIENTES: Dar de baja (Soft Delete / Cambio de Estado) ---
+app.put('/api/pacientes/:id/baja', async (req, res) => {
   const { id } = req.params;
-  const { nombre_doctor, cedula_profesional, telefono, correo } = req.body;
-
+  
   try {
-    await pool.query(
-      `UPDATE doctores 
-       SET nombre_doctor = $1, cedula_profesional = $2, telefono = $3, correo = $4
-       WHERE id_doctor = $5`,
-      [nombre_doctor, cedula_profesional, telefono, correo, id]
+    // Definimos que el ID 3 es 'DADO DE BAJA' en tu tabla 'status'
+    const ID_STATUS_BAJA = 3; 
+
+    const result = await pool.query(
+      'UPDATE pacientes SET status = $1 WHERE id_paciente = $2 RETURNING *', 
+      [ID_STATUS_BAJA, id]
     );
-    res.json({ message: "Datos del doctor actualizados correctamente" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: error.message });
-  }
-});
 
-// --- 8. PERSONAL: Eliminar Doctor ---
-app.delete('/api/doctores/:id', async (req, res) => {
-  const { id } = req.params;
-  try {
-    await pool.query("UPDATE doctores SET estado = 'Inactivo' WHERE id_doctor = $1", [id]);
-    res.json({ message: "Doctor dado de baja exitosamente" });
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "No encontramos al paciente. Quizás ya se dio de alta por su cuenta." });
+    }
+
+    res.json({ 
+      message: "Paciente enviado al archivo muerto con éxito. Ya no aparecerá en las listas activas, pero sus secretos (médicos) están a salvo con nosotros." 
+    });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Fallo multiorgánico en el servidor al intentar procesar la baja." });
   }
 });
 
