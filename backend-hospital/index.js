@@ -11,7 +11,7 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-async function enviarWhatsApp(telefono, nombrePlantilla, variables) {
+async function enviarWhatsApp(telefono, nombrePlantilla, variables, idioma = "es_MX") {
   const WA_PHONE_ID = process.env.WA_PHONE_ID;
   const WA_TOKEN = process.env.WA_TOKEN;
 
@@ -24,7 +24,7 @@ async function enviarWhatsApp(telefono, nombrePlantilla, variables) {
     type: "template",
     template: {
       name: nombrePlantilla,
-      language: { code: "es_MX" },
+      language: { code: idioma },
       components: [
         {
           type: "body",
@@ -248,6 +248,7 @@ app.put('/api/citas/:id/estado', async (req, res) => {
 
 // --- 7. PERSONAL: Añadir nuevo Doctor ---
 app.post('/api/doctores', async (req, res) => {
+  console.log("👉 DATOS QUE LLEGARON DEL FORMULARIO DE DOCTOR:", req.body);
   const { nombre, cedula_profesional, telefono, correo, usuario, contrasena } = req.body;
   
   if (!nombre || !contrasena) {
@@ -262,6 +263,20 @@ app.post('/api/doctores', async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, $6, 'Activo') RETURNING *`,
       [nombre, cedula_profesional, telefono, correo, usuario, contrasenaHasheada]
     );
+
+    // 🚨 DISPARAR WHATSAPP DE "BIENVENIDA" AL DOCTOR (Hack de Cita)
+    let telDoctor = telefono;
+    if (telDoctor) {
+      telDoctor = String(telDoctor);
+      if (!telDoctor.startsWith("52")) telDoctor = "52" + telDoctor;
+
+      // Variables: {{1}} Nombre, {{2}} Usuario, {{3}} Contraseña plana
+      // Recuerda que aquí la variable del body se llama 'contrasena'
+      const varsDoctor = [nombre, usuario, contrasena];
+      
+      // ⚠️ IMPORTANTE: Cambia esto también
+      enviarWhatsApp(telDoctor, "bienvenida_doctor", varsDoctor, "es");
+    }
     
     res.status(201).json(nuevoDoctor.rows[0]);
   } catch (error) {
@@ -318,6 +333,20 @@ app.post('/api/pacientes', async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, $6, 1, $7) RETURNING *`,
       [nombre_paciente, curp, numero_telefono, edad, sexo, correo, contrasenaHasheada]
     );
+
+    // 🚨 DISPARAR WHATSAPP DE "BIENVENIDA" (Hack de Cita)
+    let telPaciente = numero_telefono;
+    if (telPaciente) {
+      telPaciente = String(telPaciente);
+      // Asegurarnos de que tenga el código de país
+      if (!telPaciente.startsWith("52")) telPaciente = "52" + telPaciente;
+
+      // Variables: {{1}} Nombre, {{2}} CURP, {{3}} Contraseña plana
+      const varsPaciente = [nombre_paciente, curp, contrasena_plana];
+      
+      // ⚠️ IMPORTANTE: Cambia "nombre_de_tu_plantilla" por el nombre exacto que le pusiste en Meta
+      enviarWhatsApp(telPaciente, "bienvenida_paciente", varsPaciente, "es"); 
+    }
 
     res.status(201).json(nuevoPaciente.rows[0]);
   } catch (error) {

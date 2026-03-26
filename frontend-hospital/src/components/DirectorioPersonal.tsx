@@ -81,24 +81,51 @@ export function DirectorioPersonal() {
     return coincideTab && coincideBusqueda;
   });
 
-  // 3. Simulación de Crear POST
-  const handleCrear = (e: React.FormEvent) => {
+// 3. POST: Crear Nuevo Doctor de verdad
+  const handleCrear = async (e: React.FormEvent) => {
     e.preventDefault();
-    const iniciales = nuevoEmpleado.nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     
-    const empleado = {
-      id: `E-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
-      ...nuevoEmpleado,
-      estado: "Descanso",
-      avatar: iniciales
-    };
-    
-    setEmpleados([...empleados, empleado]);
-    setModalNuevo(false);
-    setNuevoEmpleado({ 
-      nombre: "", rol: "", tipo: "doctor", cedula_profesional: "",
-      telefono: "", correo: "", usuario: "", contrasena: "", consultorio: ""
-    });
+    // De momento, tu backend solo tiene ruta para crear doctores
+    if (nuevoEmpleado.tipo !== 'doctor') {
+      alert("Por ahora el backend solo soporta registrar Doctores.");
+      return;
+    }
+
+    try {
+      const res = await fetch("http://localhost:3000/api/doctores", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: nuevoEmpleado.nombre,
+          cedula_profesional: nuevoEmpleado.cedula_profesional,
+          telefono: nuevoEmpleado.telefono, 
+          correo: nuevoEmpleado.correo,
+          usuario: nuevoEmpleado.usuario,
+          contrasena: nuevoEmpleado.contrasena
+        })
+      });
+
+      if (res.ok) {
+        // Si se guardó bien en la BD y se mandó el WhatsApp:
+        alert("¡Personal registrado con éxito!");
+        setModalNuevo(false);
+        
+        // Limpiamos el formulario
+        setNuevoEmpleado({ 
+          nombre: "", rol: "", tipo: "doctor", cedula_profesional: "",
+          telefono: "", correo: "", usuario: "", contrasena: "", consultorio: ""
+        });
+        
+        // Recargamos la lista desde la base de datos
+        fetchEmpleados(); 
+      } else {
+        const errorData = await res.json();
+        alert("Error al registrar: " + errorData.error);
+      }
+    } catch (error) {
+      console.error("Error de conexión:", error);
+      alert("Hubo un error al conectar con el servidor.");
+    }
   };
 
   // 4. PUT: Editar Datos del Doctor
