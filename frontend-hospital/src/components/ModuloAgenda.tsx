@@ -98,7 +98,7 @@ export function ModuloAgenda() {
     }
   };
 
-  const actualizarEstadoEnAPI = async (id_cita: string | number, nuevoEstado: string, motivo?: string) => {
+ const actualizarEstadoEnAPI = async (id_cita: string | number, nuevoEstado: string, motivo?: string) => {
     try {
       const payload: any = { estado: nuevoEstado };
       if (motivo) payload.motivo_cancelacion = motivo;
@@ -121,7 +121,11 @@ export function ModuloAgenda() {
 
   const handleCambiarEstado = () => {
     if (!modalConfirmacion.cita || !modalConfirmacion.accion) return;
-    const nuevoEstado = modalConfirmacion.accion === 'Confirmar' ? 'Confirmada' : 'Cancelada';
+    // Adaptamos los estados para que coincidan exactamente con lo que espera tu Backend para WhatsApp
+    let nuevoEstado = '';
+    if (modalConfirmacion.accion === 'Confirmar') nuevoEstado = 'Confirmada';
+    else if (modalConfirmacion.accion === 'Cancelar') nuevoEstado = 'Cancelada';
+    else if (modalConfirmacion.accion === 'Rechazar') nuevoEstado = 'Rechazada'; // Nueva acción
     
     actualizarEstadoEnAPI(modalConfirmacion.cita.id_cita, nuevoEstado, motivoCancelacion);
     
@@ -129,7 +133,7 @@ export function ModuloAgenda() {
     setMotivoCancelacion("");
     setCitaSeleccionada(null);
   };
-  
+
 
   const handleIniciarConsulta = () => {
     if (!citaSeleccionada) return;
@@ -299,9 +303,18 @@ export function ModuloAgenda() {
                                 </div>
                               )}
                             </div>
-                          </div>
-                          
-                          <div className="flex items-center gap-3 shrink-0">
+                          </div>                       
+                            <div className="flex items-center gap-3 shrink-0">
+                            {/* BOTÓN RECHAZAR */}
+                            <Boton 
+                              variante="secundario" 
+                              className="px-4 py-2 border border-gray-200 text-gray-600 hover:bg-gray-100"
+                              onClick={() => setModalConfirmacion({ isOpen: true, cita, accion: 'Rechazar' as any })}
+                            >
+                              <XCircle className="w-4 h-4 mr-1.5" /> Rechazar
+                            </Boton>
+
+                            {/* BOTÓN CANCELAR */}
                             <Boton 
                               variante="peligro" 
                               className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 border-none"
@@ -309,6 +322,8 @@ export function ModuloAgenda() {
                             >
                               <XCircle className="w-4 h-4 mr-1.5" /> Cancelar
                             </Boton>
+                            
+                            {/* BOTÓN CONFIRMAR */}
                             <Boton 
                               className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white border-none"
                               onClick={() => setModalConfirmacion({ isOpen: true, cita, accion: 'Confirmar' })}
@@ -589,12 +604,17 @@ export function ModuloAgenda() {
             </div>
             
             {modalConfirmacion.accion === 'Cancelar' && (
-              <Input 
-                label="Motivo de cancelación (Opcional)" 
-                placeholder="Ej. Paciente no podrá asistir..." 
-                value={motivoCancelacion}
-                onChange={(e) => setMotivoCancelacion(e.target.value)}
-              />
+              <Select 
+                label="Tipo de Cita" 
+                required 
+                value={nuevaCita.tipo_cita}
+                onChange={(e) => setNuevaCita({...nuevaCita, tipo_cita: e.target.value})}
+              >
+                <option value="Consulta">Consulta</option>
+                <option value="Urgencia">Urgencia</option>
+                <option value="Cirugía">Cirugía</option>
+                <option value="Estudios">Estudios</option>
+              </Select>
             )}
 
             <div className="flex justify-end gap-3 pt-4 border-t border-black/[0.05]">

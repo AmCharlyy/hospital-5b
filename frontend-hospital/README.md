@@ -1,20 +1,39 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+  <h1>ACSP | Directorio Médico</h1>
+  <p>Sistema de Gestión Hospitalaria Inteligente</p>
 </div>
 
-# Run and deploy your AI Studio app
+<div align="center">
+  <img src="https://img.shields.io/badge/Estado-En_Desarrollo-blue?style=for-the-badge" alt="Status">
+  <img src="https://img.shields.io/badge/Enfoque-Médico-3B82F6?style=for-the-badge" alt="Focus">
+</div>
 
-This contains everything you need to run your app locally.
+<br />
 
-View your app in AI Studio: https://ai.studio/apps/0ffacf36-95b1-4000-8e2d-8743cf31449c
+## Descripción del Proyecto
 
-## Run Locally
+**ACSP** es una plataforma centralizada diseñada para la administración eficiente del personal de salud, sus roles operativos y su disponibilidad en tiempo real. Ofrece una interfaz intuitiva para optimizar los flujos de trabajo administrativos del hospital.
 
-**Prerequisites:**  Node.js
+---
 
+## Funcionalidades Clave
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+* **Directorio Médico:** Registro detallado de médicos, enfermería y personal administrativo.
+* **Disponibilidad en Tiempo Real:** Monitoreo del estado operativo del personal (ej. Disponible, Ocupado).
+* **Infraestructura y Agenda:** Herramientas para visualizar instalaciones y gestionar citas.
+
+---
+
+## Prerrequisitos
+
+Para ejecutar este proyecto de forma local necesitas:
+* **Node.js** (v18.0.0 o superior)
+* **Git**
+
+---
+
+## Guía de Instalación y Ejecución
+
+### 1. Clonar el repositorio
+```bash
+git clone [https://github.com/AmCharlyy/hospital-5b.git](https://github.com/AmCharlyy/hospital-5b.git)

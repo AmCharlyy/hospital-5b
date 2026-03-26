@@ -23,7 +23,7 @@ export function ModuloPacientes() {
     curp: "", 
     codigo_pais: "+52", 
     numero_telefono: "", 
-    sexo: "Masculino", 
+    sexo: "", 
     correo: "", 
     edad: 0 
   });
@@ -116,8 +116,8 @@ export function ModuloPacientes() {
           // Si añades más columnas al PUT de tu backend:
           // codigo_pais: pacienteAEditar.codigo_pais,
           correo: pacienteAEditar.correo,
-          edad: pacienteAEditar.edad,
-          sexo: pacienteAEditar.sexo
+          edad: pacienteAEditar.edad || 0,
+          sexo: pacienteAEditar.sexo || "Masculino"
         })
       });
 
@@ -297,7 +297,7 @@ export function ModuloPacientes() {
               <select 
                 className="px-3 py-2.5 bg-gray-50/50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 border border-black/[0.05] shadow-sm w-28"
                 value={nuevoPaciente.codigo_pais}
-                onChange={(e) => setNuevoPaciente({...nuevoPaciente, codigo_pais: e.target.value})}
+                onChange={(e) => setPacienteAEditar({...pacienteAEditar, sexo: e, codigo_pais: e.target.value})}
               >
                 <option value="+52">🇲🇽 +52</option>
                 <option value="+1">🇺🇸 +1</option>
@@ -326,13 +326,16 @@ export function ModuloPacientes() {
               value={nuevoPaciente.edad || ""}
               onChange={(e) => setNuevoPaciente({...nuevoPaciente, edad: parseInt(e.target.value) || 0})}
             />
+            {/*Modulo NuevoPaciente*/}
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-[#1d1d1f]">Sexo</label>
-              <select 
+              <select
+                required 
                 className="px-4 py-2.5 bg-gray-50/50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 border border-black/[0.05] shadow-sm w-full"
-                value={nuevoPaciente.sexo}
+                value={nuevoPaciente.sexo || ""}
                 onChange={(e) => setNuevoPaciente({...nuevoPaciente, sexo: e.target.value})}
               >
+                <option value="" disabled>Elegir una opcion</option>
                 <option value="Masculino">Masculino</option>
                 <option value="Femenino">Femenino</option>
                 <option value="Otro">Otro</option>
@@ -517,6 +520,8 @@ export function ModuloPacientes() {
                 value={pacienteAEditar.edad || ""}
                 onChange={(e) => setPacienteAEditar({...pacienteAEditar, edad: parseInt(e.target.value) || 0})}
               />
+
+              {/*Modulo EditarPaciente*/}
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium text-[#1d1d1f]">Sexo</label>
                 <select 
@@ -524,6 +529,7 @@ export function ModuloPacientes() {
                   value={pacienteAEditar.sexo || "Masculino"}
                   onChange={(e) => setPacienteAEditar({...pacienteAEditar, sexo: e.target.value})}
                 >
+                  <option value="" disabled>Elegir una opcion</option>
                   <option value="Masculino">Masculino</option>
                   <option value="Femenino">Femenino</option>
                   <option value="Otro">Otro</option>
