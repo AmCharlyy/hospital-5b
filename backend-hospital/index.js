@@ -75,7 +75,7 @@ app.get('/api/consultorios', async (req, res) => {
   }
 });
 
-// --- 1.5 NUEVO: Consultorios Disponibles para los Menús Desplegables ---
+// --- 1.2 Consultorios Disponibles para los Menús Desplegables ---
 app.get('/api/consultorios-disponibles', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -91,7 +91,96 @@ app.get('/api/consultorios-disponibles', async (req, res) => {
   }
 });
 
-// --- 1.8. Obtener Especialidades
+// --- 2. AUXILIARES: Asegurar tabla y CRUD básico ---
+(async function ensureAuxiliaresTable() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS auxiliares (
+        id_auxiliar SERIAL PRIMARY KEY,
+        nombre TEXT NOT NULL,
+        apellido TEXT NOT NULL,
+        tipo_auxiliar TEXT NOT NULL,
+        turno TEXT NOT NULL
+      );
+    `);
+    console.log('Tabla auxiliares verificada');
+  } catch (error) {
+    console.error('Error al crear/verificar la tabla auxiliares:', error);
+  }
+})();
+
+// --- 2.1. Auxiliares Obtener datos de auxiliares
+app.get('/api/auxiliares', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id_auxiliar, nombre, apellido, tipo_auxiliar, turno
+      FROM auxiliares
+      ORDER BY id_auxiliar ASC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al obtener auxiliares' });
+  }
+});
+
+// --- 2.2. Crear un nuevo auxiliar
+app.post('/api/auxiliares', async (req, res) => {
+  const { nombre, apellido, tipo_auxiliar, turno } = req.body;
+  if (!nombre || !apellido || !tipo_auxiliar || !turno) {
+    return res.status(400).json({ error: 'Faltan datos obligatorios de auxiliar' });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO auxiliares (nombre, apellido, tipo_auxiliar, turno) VALUES ($1, $2, $3, $4) RETURNING *`,
+      [nombre, apellido, tipo_auxiliar, turno]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al crear auxiliar' });
+  }
+});
+
+// --- 2.3 Editar auxiliares existentes
+app.put('/api/auxiliares/:id', async (req, res) => {
+  const { id } = req.params;
+  const { nombre, apellido, tipo_auxiliar, turno } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE auxiliares SET nombre = $1, apellido = $2, tipo_auxiliar = $3, turno = $4 WHERE id_auxiliar = $5 RETURNING *`,
+      [nombre, apellido, tipo_auxiliar, turno, id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Auxiliar no encontrado' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al actualizar auxiliar' });
+  }
+});
+
+// --- -2.4 Borrar Auxiliares Permanentemente (Riesgo!)
+app.delete('/api/auxiliares/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query('DELETE FROM auxiliares WHERE id_auxiliar = $1', [id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Auxiliar no encontrado' });
+    }
+    res.json({ message: 'Auxiliar eliminado correctamente' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al eliminar auxiliar' });
+  }
+});
+
+// --- 3. Obtener Especialidades
 app.get('/api/especialidades', async (req, res) => {
   try {
     const result = await pool.query('SELECT id_especialidad, nombre FROM especialidades ORDER BY nombre ASC');
@@ -101,7 +190,7 @@ app.get('/api/especialidades', async (req, res) => {
   }
 });
 
-// --- 2. PERSONAL: Doctores (Obtener) ---
+// --- 4. PERSONAL: Doctores (Obtener) ---
 app.get('/api/doctores/estado', async (req, res) => {
   try {
     const query = `
@@ -133,12 +222,12 @@ app.get('/api/doctores/estado', async (req, res) => {
   }
 });
 
-// --- 3. PACIENTES (Obtener) ---
+// --- 5. PACIENTES (Obtener) ---
 app.get('/api/pacientes/completo', async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT p.id_paciente, p.nombre_paciente, p.curp, p.numero_telefono, 
-             p.edad, p.sexo, p.correo, s.status as estado,
+             p.edad, p.sexo, p.correo, s.status as estado, p.num_expediente,
              TO_CHAR(p.fecha_registro, 'DD-MM-YYYY') as fecha_registro
       FROM pacientes p 
       LEFT JOIN status s ON p.status = s.id_status
@@ -151,7 +240,7 @@ app.get('/api/pacientes/completo', async (req, res) => {
   }
 });
 
-// --- 4. AGENDA: Obtener todas las citas ---
+// --- 5. AGENDA: Obtener todas las citas ---
 app.get('/api/citas', async (req, res) => {
   try {
     const query = `
@@ -172,7 +261,7 @@ app.get('/api/citas', async (req, res) => {
   }
 });
 
-// --- 5. AGENDA: Crear cita y automatizar consultorio ---
+// --- 6. AGENDA: Crear cita y automatizar consultorio ---
 app.post('/api/citas', async (req, res) => {
   const { id_paciente, fecha, id_consultorio, id_doctor, tipo_cita, hora } = req.body;
   if (!id_paciente || !id_doctor || !fecha || !hora) {
@@ -209,7 +298,7 @@ app.post('/api/citas', async (req, res) => {
   }
 });
 
-// 6. --- AGENDA: Finalizar, Cancelar o Confirmar cita y avisar por WhatsApp ---
+// 7. --- AGENDA: Finalizar, Cancelar o Confirmar cita y avisar por WhatsApp ---
 app.put('/api/citas/:id/estado', async (req, res) => {
   const { id } = req.params;
   const { estado } = req.body;
@@ -275,7 +364,7 @@ app.put('/api/citas/:id/estado', async (req, res) => {
   }
 });
 
-// --- 7. PERSONAL: Añadir nuevo Doctor ---
+// --- 7. Añadir nuevo Doctor ---
 app.post('/api/doctores', async (req, res) => {
 
   // Ahora recibimos 'consultorio' desde el frontend
@@ -319,7 +408,7 @@ app.put('/api/doctores/:id', async (req, res) => {
     }
 
     res.json({ 
-      message: "Paciente enviado al archivo muerto con éxito. Ya no aparecerá en las listas activas, pero sus secretos (médicos) están a salvo con nosotros." 
+      message: "Paciente enviado al archivo muerto con éxito. Ya no aparecerá en las listas activas" 
     });
   } catch (error) {
     console.error(error);
@@ -327,7 +416,7 @@ app.put('/api/doctores/:id', async (req, res) => {
   }
 });
 
-// --- 9. PACIENTES: Registrar nuevo paciente ---
+// --- 8. PACIENTES: Registrar nuevo paciente ---
 app.post('/api/pacientes', async (req, res) => {
   const { nombre_paciente, curp, numero_telefono, edad, sexo, correo, contrasena_plana } = req.body;
 
@@ -369,7 +458,7 @@ app.post('/api/pacientes', async (req, res) => {
   }
 });
 
-// --- 10. PACIENTES: Editar datos del paciente ---
+// --- 9. PACIENTES: Editar datos del paciente ---
 app.put('/api/pacientes/:id', async (req, res) => {
   const { id } = req.params;
   const { nombre_paciente, curp, numero_telefono, edad, sexo, correo } = req.body;
@@ -391,7 +480,7 @@ app.put('/api/pacientes/:id', async (req, res) => {
   }
 });
 
-// --- 11. PACIENTES: Cambiar estado ---
+// --- 10. PACIENTES: Cambiar estado ---
 app.put('/api/pacientes/:id/estado', async (req, res) => {
   const { id } = req.params;
   const { id_status } = req.body; 
@@ -405,7 +494,7 @@ app.put('/api/pacientes/:id/estado', async (req, res) => {
   }
 });
 
-// --- 12. PACIENTES: Dar de baja (Soft Delete / Cambio de Estado) ---
+// --- 11. PACIENTES: Dar de baja (Soft Delete / Cambio de Estado) ---
 app.put('/api/pacientes/:id/baja', async (req, res) => {
   const { id } = req.params;
   
@@ -432,7 +521,7 @@ app.put('/api/pacientes/:id/baja', async (req, res) => {
   }
 });
 
-// --- 13. PACIENTES: Generar nueva contraseña ---
+// --- 12. PACIENTES: Generar nueva contraseña ---
 app.put('/api/pacientes/:id/password', async (req, res) => {
   const { id } = req.params;
   const { contrasena_plana } = req.body;
