@@ -11,7 +11,7 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-async function enviarWhatsApp(telefono, nombrePlantilla, variables) {
+async function enviarWhatsApp(telefono, nombrePlantilla, variables, idioma = "es_MX") {
   const WA_PHONE_ID = process.env.WA_PHONE_ID;
   const WA_TOKEN = process.env.WA_TOKEN;
 
@@ -24,7 +24,7 @@ async function enviarWhatsApp(telefono, nombrePlantilla, variables) {
     type: "template",
     template: {
       name: nombrePlantilla,
-      language: { code: "es_MX" },
+      language: { code: idioma },
       components: [
         {
           type: "body",
@@ -333,6 +333,20 @@ app.post('/api/pacientes', async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, $6, 1, $7, (SELECT COALESCE(MAX(num_expediente), 0) + 1 FROM pacientes)) RETURNING *`,
       [nombre_paciente, curp, numero_telefono, edad, sexo, correo, contrasenaHasheada]
     );
+
+    // 🚨 DISPARAR WHATSAPP DE "BIENVENIDA" (Hack de Cita)
+    let telPaciente = numero_telefono;
+    if (telPaciente) {
+      telPaciente = String(telPaciente);
+      // Asegurarnos de que tenga el código de país
+      if (!telPaciente.startsWith("52")) telPaciente = "52" + telPaciente;
+
+      // Variables: {{1}} Nombre, {{2}} CURP, {{3}} Contraseña plana
+      const varsPaciente = [nombre_paciente, curp, contrasena_plana];
+      
+      // ⚠️ IMPORTANTE: Cambia "nombre_de_tu_plantilla" por el nombre exacto que le pusiste en Meta
+      enviarWhatsApp(telPaciente, "bienvenida_paciente", varsPaciente, "es"); 
+    }
 
     res.status(201).json(nuevoPaciente.rows[0]);
   } catch (error) {
