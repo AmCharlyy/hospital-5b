@@ -11,9 +11,12 @@ export function DirectorioPersonal() {
   // Estado para los empleados que vienen de la base de datos
   const [empleados, setEmpleados] = useState<any[]>([]);
   
+  // NUEVO: Estado para los consultorios disponibles
+  const [consultorios, setConsultorios] = useState<any[]>([]);
+  
   // Estados de Interfaz
   const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<any | null>(null);
-  const [empleadoAEditar, setEmpleadoAEditar] = useState<any | null>(null); // NUEVO ESTADO
+  const [empleadoAEditar, setEmpleadoAEditar] = useState<any | null>(null);
   const [modalNuevo, setModalNuevo] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [filtroTab, setFiltroTab] = useState("Todos");
@@ -31,7 +34,7 @@ export function DirectorioPersonal() {
     consultorio: ""
   });
 
-  // 1. Conexión al Backend (GET)
+  // 1. Conexión al Backend (GET) - Empleados
   const fetchEmpleados = async () => {
     try {
       const res = await fetch("http://localhost:3000/api/doctores/estado");
@@ -62,8 +65,21 @@ export function DirectorioPersonal() {
     }
   };
 
+  // NUEVO: Conexión al Backend (GET) - Consultorios Disponibles
+  const fetchConsultorios = async () => {
+    try {
+      // Asegúrate de que esta URL coincida con la ruta que crearemos en tu backend
+      const res = await fetch("http://localhost:3000/api/consultorios-disponibles");
+      const data = await res.json();
+      setConsultorios(data);
+    } catch (error) {
+      console.error("Error al cargar consultorios:", error);
+    }
+  };
+
   useEffect(() => {
     fetchEmpleados();
+    fetchConsultorios(); // Llamamos a la nueva función al cargar el componente
   }, []);
 
   // 2. Lógica de Filtrado (Pestañas + Buscador)
@@ -107,7 +123,6 @@ export function DirectorioPersonal() {
     if(!empleadoAEditar) return;
 
     try {
-      // Ajusta los nombres de las columnas a como los espera tu API
       const res = await fetch(`http://localhost:3000/api/doctores/${empleadoAEditar.id_real}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -125,6 +140,7 @@ export function DirectorioPersonal() {
       if(res.ok) {
         setEmpleadoAEditar(null);
         fetchEmpleados(); // Recargar la lista
+        fetchConsultorios(); // Opcional: recargar consultorios por si alguno se ocupó
         alert("Datos actualizados correctamente");
       } else {
         const errorData = await res.json();
@@ -192,7 +208,7 @@ export function DirectorioPersonal() {
                   onClick={() => setEmpleadoSeleccionado(empleado)}
                   opciones={[
                     { etiqueta: "Ver Perfil", accion: () => setEmpleadoSeleccionado(empleado) },
-                    { etiqueta: "Editar Datos", accion: () => setEmpleadoAEditar(empleado) }, // <-- NUEVA OPCIÓN AQUI
+                    { etiqueta: "Editar Datos", accion: () => setEmpleadoAEditar(empleado) },
                     { etiqueta: "Asignar Turno", accion: () => alert(`Asignando turno a ${empleado.nombre}`) },
                     { etiqueta: "Eliminar", accion: () => alert('Ruta de eliminación no configurada en API'), peligro: true }
                   ]}
@@ -256,12 +272,21 @@ export function DirectorioPersonal() {
                 value={nuevoEmpleado.correo}
                 onChange={(e) => setNuevoEmpleado({...nuevoEmpleado, correo: e.target.value})}
               />
-              <Input 
-                label="Consultorio" 
-                placeholder="Ej. 101" 
+              
+              {/* NUEVO: Select de Consultorios para Añadir */}
+              <Select
+                label="Consultorio"
                 value={nuevoEmpleado.consultorio}
-                onChange={(e) => setNuevoEmpleado({...nuevoEmpleado, consultorio: e.target.value})}
-              />
+                onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, consultorio: e.target.value })}
+              >
+                <option value="">Seleccione un consultorio...</option>
+                {consultorios.map((cons) => (
+                  <option key={cons.id_consultorio} value={cons.id_consultorio}>
+                    {cons.nombre_consultorio}
+                  </option>
+                ))}
+              </Select>
+
               <Input 
                 label="Usuario (Sistema)" 
                 placeholder="Ej. dr.perez" 
@@ -285,7 +310,7 @@ export function DirectorioPersonal() {
         </form>
       </Modal>
 
-      {/* Modal Edición de Personal (NUEVO) */}
+      {/* Modal Edición de Personal */}
       <Modal isOpen={!!empleadoAEditar} onClose={() => setEmpleadoAEditar(null)} titulo="Editar Datos del Personal">
         {empleadoAEditar && (
           <form onSubmit={handleGuardarEdicion} className="space-y-4">
@@ -320,11 +345,20 @@ export function DirectorioPersonal() {
                   value={empleadoAEditar.correo || ""}
                   onChange={(e) => setEmpleadoAEditar({...empleadoAEditar, correo: e.target.value})}
                 />
-                <Input 
-                  label="Consultorio" 
+                
+                {/* NUEVO: Select de Consultorios para Editar */}
+                <Select
+                  label="Consultorio"
                   value={empleadoAEditar.consultorio || ""}
-                  onChange={(e) => setEmpleadoAEditar({...empleadoAEditar, consultorio: e.target.value})}
-                />
+                  onChange={(e) => setEmpleadoAEditar({ ...empleadoAEditar, consultorio: e.target.value })}
+                >
+                  <option value="">Seleccione un consultorio...</option>
+                  {consultorios.map((cons) => (
+                    <option key={cons.id_consultorio} value={cons.id_consultorio}>
+                      {cons.nombre_consultorio}
+                    </option>
+                  ))}
+                </Select>
               </div>
             )}
 

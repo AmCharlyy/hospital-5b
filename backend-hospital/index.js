@@ -75,12 +75,30 @@ app.get('/api/consultorios', async (req, res) => {
   }
 });
 
+// --- 1.5 NUEVO: Consultorios Disponibles para los Menús Desplegables ---
+app.get('/api/consultorios-disponibles', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id_consultorio, nombre_consultorio 
+      FROM consultorios 
+      WHERE disponible = true
+      ORDER BY id_consultorio ASC;
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al obtener consultorios disponibles' });
+  }
+});
+
 // --- 2. PERSONAL: Doctores (Obtener) ---
 app.get('/api/doctores/estado', async (req, res) => {
   try {
     const query = `
       SELECT d.id_doctor, d.nombre_doctor, e.nombre as especialidad,
              d.cedula_profesional, d.telefono, d.correo, d.usuario,
+             d.consultorio, -- Columna real de tu tabla doctores
+             con.nombre_consultorio as nombre_consultorio_asignado, -- Para mostrar el nombre si quieres
         CASE 
           WHEN EXISTS (
             SELECT 1 FROM citas c 
@@ -90,11 +108,12 @@ app.get('/api/doctores/estado', async (req, res) => {
             AND c.hora > CURRENT_TIME - INTERVAL '1 hour'
             AND c.estado NOT IN ('Cancelada', 'Finalizada')
           ) THEN 'En Consulta'
-          ELSE 'Disponible'
+          ELSE d.estado 
         END as estado_actual
       FROM doctores d
       LEFT JOIN especialidades e ON d.id_especialidad = e.id_especialidad
-      WHERE d.estado = 'Activo'
+      LEFT JOIN consultorios con ON d.consultorio = con.id_consultorio -- Unimos correctamente
+      WHERE d.estado != 'Inactivo' 
     `;
     const result = await pool.query(query);
     res.json(result.rows);
@@ -248,7 +267,8 @@ app.put('/api/citas/:id/estado', async (req, res) => {
 
 // --- 7. PERSONAL: Añadir nuevo Doctor ---
 app.post('/api/doctores', async (req, res) => {
-  const { nombre, cedula_profesional, telefono, correo, usuario, contrasena } = req.body;
+  // Ahora recibimos 'consultorio' desde el frontend
+  const { nombre, cedula_profesional, telefono, correo, usuario, contrasena, consultorio } = req.body;
   
   if (!nombre || !contrasena) {
     return res.status(400).json({ error: "El nombre es obligatorio." });
@@ -260,7 +280,7 @@ app.post('/api/doctores', async (req, res) => {
     const nuevoDoctor = await pool.query(
       `INSERT INTO doctores (nombre_doctor, cedula_profesional, telefono, correo, usuario, contrasena, estado) 
        VALUES ($1, $2, $3, $4, $5, $6, 'Activo') RETURNING *`,
-      [nombre, cedula_profesional, telefono, correo, usuario, contrasenaHasheada]
+      [nombre, cedula_profesional, telefono, correo, usuario, contrasena]
     );
     
     res.status(201).json(nuevoDoctor.rows[0]);
@@ -270,17 +290,17 @@ app.post('/api/doctores', async (req, res) => {
   }
 });
 
-// --- 8. PACIENTES: Dar de baja (Soft Delete / Cambio de Estado) ---
-app.put('/api/pacientes/:id/baja', async (req, res) => {
+// --- 7.5. PERSONAL: Editar datos del Doctor (¡NUEVO!) ---
+app.put('/api/doctores/:id', async (req, res) => {
   const { id } = req.params;
-  
-  try {
-    // Definimos que el ID 3 es 'DADO DE BAJA' en tu tabla 'status'
-    const ID_STATUS_BAJA = 3; 
+  const { nombre_doctor, cedula_profesional, telefono, correo } = req.body;
 
-    const result = await pool.query(
-      'UPDATE pacientes SET status = $1 WHERE id_paciente = $2 RETURNING *', 
-      [ID_STATUS_BAJA, id]
+  try {
+    await pool.query(
+      `UPDATE doctores 
+       SET nombre_doctor = $1, cedula_profesional = $2, telefono = $3, correo = $4
+       WHERE id_doctor = $5`,
+      [nombre_doctor, cedula_profesional, telefono, correo, id]
     );
 
     if (result.rowCount === 0) {
