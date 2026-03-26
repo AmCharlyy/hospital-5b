@@ -279,7 +279,7 @@ app.put('/api/citas/:id/estado', async (req, res) => {
 app.post('/api/doctores', async (req, res) => {
 
   // Ahora recibimos 'consultorio' desde el frontend
-  const { nombre, cedula_profesional, telefono, correo, usuario, contrasena, consultorio, } = req.body;
+  const { nombre, cedula_profesional, telefono, correo, usuario, contrasena, consultorio, id_especialidad} = req.body;
   
   if (!nombre || !contrasena) {
     return res.status(400).json({ error: "Campos obligatorios faltantes." });
@@ -289,7 +289,7 @@ app.post('/api/doctores', async (req, res) => {
     const contrasenaHasheada = await bcrypt.hash(contrasena, 10);
 
     const nuevoDoctor = await pool.query(
-      `INSERT INTO doctores (nombre_doctor, cedula_profesional, telefono, correo, usuario, contrasena, estado, consultorio) 
+      `INSERT INTO doctores (nombre_doctor, cedula_profesional, telefono, correo, usuario, contrasena, estado, consultorio, id_especialidad) 
        VALUES ($1, $2, $3, $4, $5, $6, 'Disponible', $7, $8) RETURNING *`,
       [nombre, cedula_profesional, telefono, correo, usuario, contrasenaHasheada, consultorio || null, id_especialidad || null]
     );
