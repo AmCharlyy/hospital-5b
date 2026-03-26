@@ -91,6 +91,91 @@ app.get('/api/consultorios-disponibles', async (req, res) => {
   }
 });
 
+// --- 1.6 AUXILIARES: Asegurar tabla y CRUD básico ---
+(async function ensureAuxiliaresTable() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS auxiliares (
+        id_auxiliar SERIAL PRIMARY KEY,
+        nombre TEXT NOT NULL,
+        apellido TEXT NOT NULL,
+        tipo_auxiliar TEXT NOT NULL,
+        turno TEXT NOT NULL
+      );
+    `);
+    console.log('Tabla auxiliares verificada');
+  } catch (error) {
+    console.error('Error al crear/verificar la tabla auxiliares:', error);
+  }
+})();
+
+app.get('/api/auxiliares', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id_auxiliar, nombre, apellido, tipo_auxiliar, turno
+      FROM auxiliares
+      ORDER BY id_auxiliar ASC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al obtener auxiliares' });
+  }
+});
+
+app.post('/api/auxiliares', async (req, res) => {
+  const { nombre, apellido, tipo_auxiliar, turno } = req.body;
+  if (!nombre || !apellido || !tipo_auxiliar || !turno) {
+    return res.status(400).json({ error: 'Faltan datos obligatorios de auxiliar' });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO auxiliares (nombre, apellido, tipo_auxiliar, turno) VALUES ($1, $2, $3, $4) RETURNING *`,
+      [nombre, apellido, tipo_auxiliar, turno]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al crear auxiliar' });
+  }
+});
+
+app.put('/api/auxiliares/:id', async (req, res) => {
+  const { id } = req.params;
+  const { nombre, apellido, tipo_auxiliar, turno } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE auxiliares SET nombre = $1, apellido = $2, tipo_auxiliar = $3, turno = $4 WHERE id_auxiliar = $5 RETURNING *`,
+      [nombre, apellido, tipo_auxiliar, turno, id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Auxiliar no encontrado' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al actualizar auxiliar' });
+  }
+});
+
+app.delete('/api/auxiliares/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query('DELETE FROM auxiliares WHERE id_auxiliar = $1', [id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Auxiliar no encontrado' });
+    }
+    res.json({ message: 'Auxiliar eliminado correctamente' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al eliminar auxiliar' });
+  }
+});
+
 // --- 2. PERSONAL: Doctores (Obtener) ---
 app.get('/api/doctores/estado', async (req, res) => {
   try {
@@ -128,7 +213,7 @@ app.get('/api/pacientes/completo', async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT p.id_paciente, p.nombre_paciente, p.curp, p.numero_telefono, 
-             p.edad, p.sexo, p.correo, s.status as estado,
+             p.edad, p.sexo, p.correo, s.status as estado, p.num_expediente,
              TO_CHAR(p.fecha_registro, 'DD-MM-YYYY') as fecha_registro
       FROM pacientes p 
       LEFT JOIN status s ON p.status = s.id_status
@@ -216,7 +301,7 @@ app.put('/api/citas/:id/estado', async (req, res) => {
       }
     }
 
-// 3. OBTENER DATOS PARA EL WHATSAPP
+    // 3. OBTENER DATOS PARA EL WHATSAPP
     const datosCita = await pool.query(`
       SELECT p.numero_telefono, p.nombre_paciente, c.hora, 
              TO_CHAR(c.fecha, 'YYYY-MM-DD') as fecha, d.nombre_doctor, con.nombre_consultorio
@@ -230,19 +315,14 @@ app.put('/api/citas/:id/estado', async (req, res) => {
     if (datosCita.rows.length > 0) {
       const info = datosCita.rows[0];
       
-      // ✅ AHORA SÍ: Tomamos el número real directo de la base de datos
       let telefono = info.numero_telefono; 
       
       if (telefono) {
         telefono = String(telefono); 
-        
-        // Volvemos a activar la regla para que le agregue el código de país si le falta
-        // (Si tu número funcionó mejor agregándole "521" en lugar de "52", cámbialo aquí)
         if (!telefono.startsWith("52")) {
           telefono = "52" + telefono; 
         }
 
-        // 4. DISPARAR EL MENSAJE SEGÚN EL ESTADO
         if (estado === 'Confirmada') {
           const vars = [info.nombre_paciente, info.fecha, info.hora, info.nombre_doctor, info.nombre_consultorio || "Por asignar"];
           enviarWhatsApp(telefono, "confirmacion", vars);
@@ -267,7 +347,6 @@ app.put('/api/citas/:id/estado', async (req, res) => {
 
 // --- 7. PERSONAL: Añadir nuevo Doctor ---
 app.post('/api/doctores', async (req, res) => {
-  // Ahora recibimos 'consultorio' desde el frontend
   const { nombre, cedula_profesional, telefono, correo, usuario, contrasena, consultorio } = req.body;
   
   if (!nombre || !contrasena) {
@@ -280,7 +359,7 @@ app.post('/api/doctores', async (req, res) => {
     const nuevoDoctor = await pool.query(
       `INSERT INTO doctores (nombre_doctor, cedula_profesional, telefono, correo, usuario, contrasena, estado) 
        VALUES ($1, $2, $3, $4, $5, $6, 'Activo') RETURNING *`,
-      [nombre, cedula_profesional, telefono, correo, usuario, contrasena]
+      [nombre, cedula_profesional, telefono, correo, usuario, contrasenaHasheada]
     );
     
     res.status(201).json(nuevoDoctor.rows[0]);
@@ -290,29 +369,40 @@ app.post('/api/doctores', async (req, res) => {
   }
 });
 
-// --- 7.5. PERSONAL: Editar datos del Doctor (¡NUEVO!) ---
+// --- 7.5. PERSONAL: Editar datos del Doctor ---
 app.put('/api/doctores/:id', async (req, res) => {
   const { id } = req.params;
   const { nombre_doctor, cedula_profesional, telefono, correo } = req.body;
 
   try {
-    await pool.query(
+    // AQUÍ ESTABA EL BUG: Faltaba definir la variable 'result' y quitar el mensaje de pacientes.
+    const result = await pool.query(
       `UPDATE doctores 
        SET nombre_doctor = $1, cedula_profesional = $2, telefono = $3, correo = $4
-       WHERE id_doctor = $5`,
+       WHERE id_doctor = $5 RETURNING *`,
       [nombre_doctor, cedula_profesional, telefono, correo, id]
     );
 
     if (result.rowCount === 0) {
-      return res.status(404).json({ error: "No encontramos al paciente. Quizás ya se dio de alta por su cuenta." });
+      return res.status(404).json({ error: "Doctor no encontrado." });
     }
 
-    res.json({ 
-      message: "Paciente enviado al archivo muerto con éxito. Ya no aparecerá en las listas activas, pero sus secretos (médicos) están a salvo con nosotros." 
-    });
+    res.json({ message: "Datos del doctor actualizados correctamente" });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Fallo multiorgánico en el servidor al intentar procesar la baja." });
+    res.status(500).json({ error: "Error interno del servidor al actualizar al doctor." });
+  }
+});
+
+// --- 8. PERSONAL: Eliminar Doctor ---
+app.delete('/api/doctores/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query("UPDATE doctores SET estado = 'Inactivo' WHERE id_doctor = $1", [id]);
+    res.json({ message: "Doctor dado de baja exitosamente" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -334,17 +424,13 @@ app.post('/api/pacientes', async (req, res) => {
       [nombre_paciente, curp, numero_telefono, edad, sexo, correo, contrasenaHasheada]
     );
 
-    // 🚨 DISPARAR WHATSAPP DE "BIENVENIDA" (Hack de Cita)
+    // 🚨 DISPARAR WHATSAPP DE "BIENVENIDA"
     let telPaciente = numero_telefono;
     if (telPaciente) {
       telPaciente = String(telPaciente);
-      // Asegurarnos de que tenga el código de país
       if (!telPaciente.startsWith("52")) telPaciente = "52" + telPaciente;
 
-      // Variables: {{1}} Nombre, {{2}} CURP, {{3}} Contraseña plana
       const varsPaciente = [nombre_paciente, curp, contrasena_plana];
-      
-      // ⚠️ IMPORTANTE: Cambia "nombre_de_tu_plantilla" por el nombre exacto que le pusiste en Meta
       enviarWhatsApp(telPaciente, "bienvenida_paciente", varsPaciente, "es"); 
     }
 

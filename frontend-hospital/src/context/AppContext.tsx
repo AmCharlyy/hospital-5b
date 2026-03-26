@@ -1,15 +1,17 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 export interface Paciente { id: string; nombre: string; curp: string; telefono: string; estado: "Activo" | "Inactivo"; fechaRegistro: string; }
 export interface Empleado { id: string; nombre: string; rol: string; estado: string; tipo: string; avatar: string; }
 export interface Habitacion { id: string; tipo: string; estado: "ocupada" | "disponible" | "mantenimiento" | "limpieza"; pacienteId: string | null; tiempo: string | null; }
 export interface Cita { id: string; pacienteId: string; doctorId: string; habitacionId?: string | null; fecha: string; hora: string; tipo: string; estado: "Programada" | "En Curso" | "Completada"; }
+export interface Auxiliar { id_auxiliar: number; nombre: string; apellido: string; tipo_auxiliar: string; turno: string; }
 
 interface AppContextType {
   pacientes: Paciente[];
   empleados: Empleado[];
   habitaciones: Habitacion[];
   citas: Cita[];
+  auxiliares: Auxiliar[];
   addPaciente: (p: Paciente) => void;
   updatePaciente: (id: string, p: Partial<Paciente>) => void;
   addEmpleado: (e: Empleado) => void;
@@ -19,6 +21,10 @@ interface AppContextType {
   deleteHabitacion: (id: string) => void;
   addCita: (c: Cita) => void;
   updateCita: (id: string, c: Partial<Cita>) => void;
+  fetchAuxiliares: () => Promise<void>;
+  addAuxiliar: (auxiliar: Omit<Auxiliar, 'id_auxiliar'>) => Promise<void>;
+  updateAuxiliar: (id: number, auxiliar: Partial<Auxiliar>) => Promise<void>;
+  deleteAuxiliar: (id: number) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -26,37 +32,75 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 const hoy = new Date().toISOString().split('T')[0];
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [pacientes, setPacientes] = useState<Paciente[]>([
-    { id: "P-1001", nombre: "María García López", curp: "GALM850412MDFRRN01", telefono: "555-0123", estado: "Activo", fechaRegistro: "2026-03-20" },
-    { id: "P-1002", nombre: "Juan Pérez Sánchez", curp: "PESJ901123HDFRRS05", telefono: "555-0198", estado: "Activo", fechaRegistro: "2026-03-21" },
-    { id: "P-1003", nombre: "Roberto Gómez Bolaños", curp: "GOBR750221HDFRRM09", telefono: "555-0145", estado: "Inactivo", fechaRegistro: "2026-03-15" },
-  ]);
+  const [pacientes, setPacientes] = useState<Paciente[]>([]);
+  const [empleados, setEmpleados] = useState<Empleado[]>([]);
+  const [habitaciones, setHabitaciones] = useState<Habitacion[]>([]);
+  const [citas, setCitas] = useState<Cita[]>([]);
+  const [auxiliares, setAuxiliares] = useState<Auxiliar[]>([]);
 
-  const [empleados, setEmpleados] = useState<Empleado[]>([
-    { id: "E-001", nombre: "Dra. Elena Ramírez", rol: "Cardiología", estado: "En Turno", tipo: "doctor", avatar: "ER" },
-    { id: "E-002", nombre: "Dr. Carlos Mendoza", rol: "Urgencias", estado: "En Turno", tipo: "doctor", avatar: "CM" },
-    { id: "E-003", nombre: "Lic. Ana Torres", rol: "Enfermería Jefe", estado: "Descanso", tipo: "enfermero", avatar: "AT" },
-    { id: "E-004", nombre: "Dr. Luis Villalobos", rol: "Pediatría", estado: "En Consulta", tipo: "doctor", avatar: "LV" },
-  ]);
+  const fetchAuxiliares = async () => {
+    try {
+      const res = await fetch('http://localhost:3000/api/auxiliares');
+      if (!res.ok) throw new Error('Error al obtener auxiliares');
+      const data: Auxiliar[] = await res.json();
+      setAuxiliares(data);
+    } catch (error) {
+      console.error('Error en fetchAuxiliares:', error);
+    }
+  };
 
-  const [habitaciones, setHabitaciones] = useState<Habitacion[]>([
-    { id: "101", tipo: "Urgencias", estado: "ocupada", pacienteId: "P-1002", tiempo: "2h 15m" },
-    { id: "102", tipo: "Urgencias", estado: "disponible", pacienteId: null, tiempo: null },
-    { id: "103", tipo: "Urgencias", estado: "mantenimiento", pacienteId: null, tiempo: null },
-    { id: "201", tipo: "Habitación", estado: "ocupada", pacienteId: "P-1001", tiempo: "1d 4h" },
-    { id: "202", tipo: "Habitación", estado: "disponible", pacienteId: null, tiempo: null },
-    { id: "C-01", tipo: "Consultorio", estado: "disponible", pacienteId: null, tiempo: null },
-    { id: "C-02", tipo: "Consultorio", estado: "ocupada", pacienteId: "P-1002", tiempo: "0h 45m" },
-  ]);
+  const addAuxiliar = async (auxiliar: Omit<Auxiliar, 'id_auxiliar'>) => {
+    try {
+      const res = await fetch('http://localhost:3000/api/auxiliares', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(auxiliar),
+      });
+      if (!res.ok) throw await res.json();
+      const data: Auxiliar = await res.json();
+      setAuxiliares(prev => [data, ...prev]);
+    } catch (error) {
+      console.error('Error en addAuxiliar:', error);
+      throw error;
+    }
+  };
 
-  const [citas, setCitas] = useState<Cita[]>([
-    { id: "C-001", pacienteId: "P-1001", doctorId: "E-001", habitacionId: "C-01", fecha: hoy, hora: "09:00", tipo: "Consulta General", estado: "Completada" },
-    { id: "C-002", pacienteId: "P-1002", doctorId: "E-004", habitacionId: "C-02", fecha: hoy, hora: "10:30", tipo: "Revisión", estado: "En Curso" },
-  ]);
+  const updateAuxiliar = async (id: number, auxiliar: Partial<Auxiliar>) => {
+    try {
+      const res = await fetch(`http://localhost:3000/api/auxiliares/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(auxiliar),
+      });
+      if (!res.ok) throw await res.json();
+      const data: Auxiliar = await res.json();
+      setAuxiliares(prev => prev.map(a => (a.id_auxiliar === id ? data : a)));
+    } catch (error) {
+      console.error('Error en updateAuxiliar:', error);
+      throw error;
+    }
+  };
+
+  const deleteAuxiliar = async (id: number) => {
+    try {
+      const res = await fetch(`http://localhost:3000/api/auxiliares/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw await res.json();
+      setAuxiliares(prev => prev.filter(a => a.id_auxiliar !== id));
+    } catch (error) {
+      console.error('Error en deleteAuxiliar:', error);
+      throw error;
+    }
+  };
+
+  useEffect(() => {
+    fetchAuxiliares();
+  }, []);
 
   return (
     <AppContext.Provider value={{
-      pacientes, empleados, habitaciones, citas,
+      pacientes, empleados, habitaciones, citas, auxiliares,
       addPaciente: (p) => setPacientes([p, ...pacientes]),
       updatePaciente: (id, p) => setPacientes(pacientes.map(x => x.id === id ? { ...x, ...p } : x)),
       addEmpleado: (e) => setEmpleados([e, ...empleados]),
@@ -66,6 +110,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteHabitacion: (id) => setHabitaciones(habitaciones.filter(x => x.id !== id)),
       addCita: (c) => setCitas([...citas, c]),
       updateCita: (id, c) => setCitas(citas.map(x => x.id === id ? { ...x, ...c } : x)),
+      fetchAuxiliares, addAuxiliar, updateAuxiliar, deleteAuxiliar,
     }}>
       {children}
     </AppContext.Provider>

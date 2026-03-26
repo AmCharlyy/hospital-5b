@@ -1,5 +1,4 @@
-// ELIMINADO: LayoutDashboard de los imports si ya no lo usas
-import { Users, Building2, Calendar, Settings, Activity, UserPlus } from "lucide-react";
+import { LayoutDashboard, Users, Building2, Calendar, Settings, Activity, UserPlus, Shield } from "lucide-react";
 import { cn } from "../lib/utils";
 
 interface Props {
@@ -8,10 +7,11 @@ interface Props {
 }
 
 export function BarraLateral({ pestanaActiva, setPestanaActiva }: Props) {
-  // CAMBIO: Eliminado "resumen" y actualizado el nombre de "personal"
   const elementosNavegacion = [
+    
     { id: "pacientes", etiqueta: "Pacientes", Icono: UserPlus },
-    { id: "personal", etiqueta: "Personal", Icono: Users },
+    { id: "personal", etiqueta: "Personal Médico", Icono: Users },
+    { id: "auxiliares", etiqueta: "Auxiliares", Icono: Shield },
     { id: "infraestructura", etiqueta: "Infraestructura", Icono: Building2 },
     { id: "agenda", etiqueta: "Agenda", Icono: Calendar },
   ];
