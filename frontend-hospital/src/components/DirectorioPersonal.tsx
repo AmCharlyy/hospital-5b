@@ -381,7 +381,6 @@ export function DirectorioPersonal() {
                 <span className="text-sm text-[#86868b]">ID Empleado</span>
                 <span className="text-sm font-mono text-[#1d1d1f]">{empleadoSeleccionado.id}</span>
               </div>
-              
               {empleadoSeleccionado.tipo === 'doctor' && (
                 <>
                   {empleadoSeleccionado.cedula_profesional && (
