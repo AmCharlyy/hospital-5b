@@ -191,8 +191,7 @@ export function PanelAuxiliares() {
               <option value="Matutino">Matutino (06:00 - 14:00)</option>
               <option value="Vespertino">Vespertino (14:00 - 22:00)</option>
               <option value="Nocturno">Nocturno (22:00 - 06:00)</option>
-              <option value="Tarde">Tarde</option>
-              <option value="Día">Día</option>
+
             </Select>
           </div>
           <div className="pt-4 flex justify-end gap-3">
@@ -241,8 +240,6 @@ export function PanelAuxiliares() {
               <option value="Matutino">Matutino (06:00 - 14:00)</option>
               <option value="Vespertino">Vespertino (14:00 - 22:00)</option>
               <option value="Nocturno">Nocturno (22:00 - 06:00)</option>
-              <option value="Tarde">Tarde</option>
-              <option value="Día">Día</option>
             </Select>
           </div>
           <div className="pt-4 flex justify-end gap-3">

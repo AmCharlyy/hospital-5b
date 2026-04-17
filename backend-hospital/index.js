@@ -246,8 +246,10 @@ app.put('/api/habitaciones/:id/estado', async (req, res) => {
   }
 });
 
+//================================
+//       --- Auxiliares ---
+//================================
 
-// --- Auxiliares ---
 (async function ensureAuxiliaresTable() {
   try {
     await pool.query(`
@@ -266,12 +268,10 @@ app.put('/api/habitaciones/:id/estado', async (req, res) => {
 })();
 
 app.route('/api/auxiliares')
-  .get(async (req, res) => {
+  .get(async (req, res) => {  //ObtenerAuxiliares
     try {
       const result = await pool.query(`
-        SELECT id_auxiliar, nombre, apellido, tipo_auxiliar, turno
-        FROM auxiliares
-        ORDER BY id_auxiliar ASC
+        SELECT * FROM auxiliares ORDER BY id_auxiliar DESC
       `);
       res.json(result.rows);
     } catch (error) {
@@ -279,7 +279,7 @@ app.route('/api/auxiliares')
       res.status(500).json({ error: 'Error al obtener auxiliares' });
     }
   })
-  .post(async (req, res) => {
+  .post(async (req, res) => {   //Añadir nuevo Auxiliar
     const { nombre, apellido, tipo_auxiliar, turno } = req.body;
     if (!nombre || !apellido || !tipo_auxiliar || !turno) {
       return res.status(400).json({ error: 'Faltan datos obligatorios de auxiliar' });
@@ -298,7 +298,7 @@ app.route('/api/auxiliares')
   });
 
 app.route('/api/auxiliares/:id')
-  .put(async (req, res) => {
+  .put(async (req, res) => {    //Editar Auxiliar
     const { id } = req.params;
     const { nombre, apellido, tipo_auxiliar, turno } = req.body;
 
