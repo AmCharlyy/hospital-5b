@@ -481,16 +481,25 @@ app.put('/api/pacientes/:id/estado', async (req, res) => {
 
 app.put('/api/pacientes/:id/baja', async (req, res) => {
   const { id } = req.params;
+  
   try {
+    const queryId = await pool.query("SELECT id_estado FROM status WHERE nombre_estado ILIKE 'BAJA'");
+    
+    if (queryId.rows.length === 0) {
+      return res.status(404).json({ error: "No existe el estado 'BAJA' en tu tabla status." });
+    }
+
+    const idBaja = queryId.rows[0].id_estado;
+
+    // 2. Ahora usamos ese ID dinámico
     const result = await pool.query(
-      'UPDATE pacientes SET status = $1 WHERE id_paciente = $2 RETURNING *',
-      [5, id]
+      'UPDATE pacientes SET status = $1 WHERE id_paciente = $2 RETURNING *', 
+      [idBaja, id]
     );
-    if (result.rowCount === 0) return res.status(404).json({ error: "No encontramos al paciente. Quizás ya se dio de alta por su cuenta." });
-    res.json({ message: "Paciente enviado al archivo muerto con éxito. Ya no aparecerá en las listas activas, pero sus secretos (médicos) están a salvo con nosotros." });
+
+    res.json({ message: "Paciente dado de baja exitosamente." });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Fallo multiorgánico en el servidor al intentar procesar la baja." });
+    res.status(500).json({ error: error.message });
   }
 });
 
