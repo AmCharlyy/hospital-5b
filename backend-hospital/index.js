@@ -344,6 +344,100 @@ app.get('/api/especialidades', async (req, res) => {
 // ==========================================
 // --- 3. PERSONAL: Doctores ---
 // ==========================================
+// --- PERSONAL UNIFICADO: Directorio General ---
+app.get('/api/personal/completo', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      -- 1. Doctores
+      SELECT d.id_doctor as id_real, d.nombre_doctor as nombre, e.nombre as especialidad,
+             d.cedula_profesional, d.telefono, d.correo, d.usuario,
+             'doctor' as tipo, d.estado as estado_actual
+      FROM doctores d
+      LEFT JOIN especialidades e ON d.id_especialidad = e.id_especialidad
+      WHERE d.estado != 'Inactivo'
+
+      UNION ALL
+
+      -- 2. Administrativos (Adaptado a tus 4 columnas exactas)
+      SELECT a.id as id_real, a.nombre as nombre, a.puesto as especialidad,
+             '' as cedula_profesional, '' as telefono, '' as correo, '' as usuario,
+             'administrativo' as tipo, 'Activo' as estado_actual
+      FROM administrativos a
+
+      UNION ALL
+
+      -- 3. Enfermeros (Conecta perfecto con tu tabla)
+      SELECT id_enfermero as id_real, nombre_enfermero as nombre, 'Enfermería' as especialidad,
+             '' as cedula_profesional, telefono, correo, usuario,
+             'enfermero' as tipo, estado as estado_actual
+      FROM enfermeros
+      WHERE estado != 'Inactivo'
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- ADMINISTRATIVOS ---
+app.post('/api/administrativos', async (req, res) => {
+  const { nombre } = req.body; 
+  if (!nombre) return res.status(400).json({ error: "El nombre es obligatorio." });
+
+  try {
+    const nuevoAdmin = await pool.query(
+      `INSERT INTO administrativos (nombre, puesto, nombre_apartamentos) 
+       VALUES ($1, 'Administrativo General', 'Recepción') RETURNING *`,
+      [nombre]
+    );
+    res.status(201).json(nuevoAdmin.rows[0]);
+  } catch (error) {
+    console.error("Error en DB:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- ENFERMEROS ---
+app.post('/api/enfermeros', async (req, res) => {
+  const { nombre, telefono, correo, usuario, contrasena } = req.body;
+  try {
+    const contrasenaHasheada = await bcrypt.hash(contrasena, 10);
+    const nuevoEnf = await pool.query(
+      `INSERT INTO enfermeros (nombre_enfermero, telefono, correo, usuario, contrasena, estado) 
+       VALUES ($1, $2, $3, $4, $5, 'Activo') RETURNING *`,
+      [nombre, telefono, correo, usuario, contrasenaHasheada]
+    );
+    res.status(201).json(nuevoEnf.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- ENFERMEROS ---
+app.post('/api/enfermeros', async (req, res) => {
+  const { nombre, telefono, correo, usuario, contrasena } = req.body;
+  try {
+    const contrasenaHasheada = await bcrypt.hash(contrasena, 10);
+    const nuevoEnf = await pool.query(
+      `INSERT INTO enfermeros (nombre_enfermero, telefono, correo, usuario, contrasena, estado) 
+       VALUES ($1, $2, $3, $4, $5, 'Activo') RETURNING *`,
+      [nombre, telefono, correo, usuario, contrasenaHasheada]
+    );
+    res.status(201).json(nuevoEnf.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/enfermeros/:id', async (req, res) => {
+  try {
+    await pool.query("UPDATE enfermeros SET estado = 'Inactivo' WHERE id_enfermero = $1", [req.params.id]);
+    res.json({ message: "Enfermero dado de baja exitosamente" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 app.get('/api/doctores/estado', async (req, res) => {
   try {

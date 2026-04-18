@@ -20,7 +20,6 @@ export function DirectorioPersonal() {
   const [consultorios, setConsultorios] = useState<any[]>([]);
   const [especialidades, setEspecialidades] = useState<any[]>([]);
 
-
   // Estado para el formulario de nuevo empleado
   const [nuevoEmpleado, setNuevoEmpleado] = useState({
     nombre: "",
@@ -37,62 +36,55 @@ export function DirectorioPersonal() {
   // 1. Conexión al Backend (GET) - Empleados
   const fetchEmpleados = async () => {
     try {
-      const res = await fetch("http://localhost:3000/api/doctores/estado");
+      const res = await fetch("http://localhost:3000/api/personal/completo");
       const data = await res.json();
-
-      const doctoresFormateados = data.map((doc: any) => {
-        const partes = doc.nombre_doctor.split(' ');
-        const iniciales = partes.length > 1 ? partes[0][0] + partes[1][0] : doc.nombre_doctor.substring(0, 2);
+      
+      const personalFormateado = data.map((emp: any) => {
+        const partes = emp.nombre.split(' ');
+        const iniciales = partes.length > 1 ? partes[0][0] + partes[1][0] : emp.nombre.substring(0, 2);
 
         return {
-          id: `DOC-${doc.id_doctor}`,
-          id_real: doc.id_doctor, // Necesario para el PUT
-          nombre: doc.nombre_doctor,
-          rol: doc.especialidad || 'General',
-          id_especialidad: doc.id_especialidad || null,
-          tipo: 'doctor',
-          estado: doc.estado_actual || 'Disponible',
+          id: `${emp.tipo.substring(0,3).toUpperCase()}-${emp.id_real}`,
+          id_real: emp.id_real,
+          nombre: emp.nombre,
+          rol: emp.especialidad || 'General',
+          tipo: emp.tipo,
+          estado: emp.estado_actual || 'Disponible',
           avatar: iniciales.toUpperCase(),
-          cedula_profesional: doc.cedula_profesional || "",
-          telefono: doc.telefono || "",
-          correo: doc.correo || "",
-          usuario: doc.usuario || "",
-          consultorio: doc.consultorio || ""
+          cedula_profesional: emp.cedula_profesional || "",
+          telefono: emp.telefono || "Sin teléfono",
+          correo: emp.correo || "Sin correo",
+          usuario: emp.usuario || "",
+          consultorio: emp.consultorio || ""
         };
       });
-      setEmpleados(doctoresFormateados);
+      setEmpleados(personalFormateado);
     } catch (error) {
-      console.error("Error al cargar empleados:", error);
+      console.error("Error al cargar personal:", error);
     }
   };
 
-  // NUEVO: Conexión al Backend (GET) - Consultorios Disponibles
+  // 2. Conexión al Backend (GET) - Consultorios Disponibles
   const fetchConsultorios = async () => {
     try {
-      // Asegúrate de que esta URL coincida con la ruta que crearemos en tu backend
       const res = await fetch("http://localhost:3000/api/consultorios-disponibles");
       const data = await res.json();
-
       if (Array.isArray(data)) {
         setConsultorios(data);
       } else {
-        console.warn("El servidor no devolvió un array de consultorios.");
         setConsultorios([]);
       }
-
     } catch (error) {
       console.error("Error al cargar consultorios:", error);
     }
   };
 
-  //Conexion Especialidades
+  // 3. Conexion Especialidades
   const fetchEspecialidades = async () => {
     try {
       const res = await fetch("http://localhost:3000/api/especialidades");
       const data = await res.json();
-      
-      setEspecialidades(Array.isArray(data) ? data : []);  
-
+      setEspecialidades(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error al cargar especialidades");
     }
@@ -101,10 +93,10 @@ export function DirectorioPersonal() {
   useEffect(() => {
     fetchEmpleados();
     fetchConsultorios();
-    fetchEspecialidades(); // Llamamos a la nueva función al cargar el componente
+    fetchEspecialidades();
   }, []);
 
-  //Lógica de Filtrado (Pestañas + Buscador)
+  // Lógica de Filtrado (Pestañas + Buscador)
   const empleadosFiltrados = empleados.filter((emp) => {
     const coincideTab =
       filtroTab === "Todos" ||
@@ -119,45 +111,39 @@ export function DirectorioPersonal() {
     return coincideTab && coincideBusqueda;
   });
 
-  //3. --- Crear Nuevo Doctor de verdad
+  // POST: Crear Nuevo Personal Dinámico 
   const handleCrear = async (e: React.FormEvent) => {
     e.preventDefault();
+    let endpoint = "";
+    if (nuevoEmpleado.tipo === 'doctor') endpoint = "http://localhost:3000/api/doctores";
+    else if (nuevoEmpleado.tipo === 'administrativo') endpoint = "http://localhost:3000/api/administrativos";
+    else if (nuevoEmpleado.tipo === 'enfermero') endpoint = "http://localhost:3000/api/enfermeros";
 
-    // De momento, tu backend solo tiene ruta para crear doctores
-    if (nuevoEmpleado.tipo !== 'doctor') {
-      alert("Por ahora el backend solo soporta registrar Doctores.");
-      return;
-    }
-
+    if (!endpoint) return alert("Ruta no configurada para este rol.");
+    
     try {
-      const res = await fetch("http://localhost:3000/api/doctores", {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nombre: nuevoEmpleado.nombre,
           cedula_profesional: nuevoEmpleado.cedula_profesional,
-          telefono: nuevoEmpleado.telefono,
+          telefono: nuevoEmpleado.telefono, 
           correo: nuevoEmpleado.correo,
           usuario: nuevoEmpleado.usuario,
           contrasena: nuevoEmpleado.contrasena,
-          consultorio: nuevoEmpleado.consultorio,
-          id_especialidad: nuevoEmpleado.rol
+          rol: nuevoEmpleado.rol // Lo enviamos para los administrativos y doctores
         })
       });
 
       if (res.ok) {
-        // Si se guardó bien en la BD y se mandó el WhatsApp:
         alert("¡Personal registrado con éxito!");
         setModalNuevo(false);
-
-        // Limpiamos el formulario
-        setNuevoEmpleado({
+        setNuevoEmpleado({ 
           nombre: "", rol: "", tipo: "doctor", cedula_profesional: "",
           telefono: "", correo: "", usuario: "", contrasena: "", consultorio: ""
         });
-
-        // Recargamos la lista desde la base de datos
-        fetchEmpleados();
+        fetchEmpleados(); 
       } else {
         const errorData = await res.json();
         alert("Error al registrar: " + errorData.error);
@@ -168,7 +154,7 @@ export function DirectorioPersonal() {
     }
   };
 
-  // 4. PUT: Editar Datos del Doctor
+  // PUT: Editar Datos del Personal
   const handleGuardarEdicion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!empleadoAEditar) return;
@@ -191,8 +177,8 @@ export function DirectorioPersonal() {
 
       if (res.ok) {
         setEmpleadoAEditar(null);
-        fetchEmpleados(); // Recargar la lista
-        fetchConsultorios(); // Opcional: recargar consultorios por si alguno se ocupó
+        fetchEmpleados();
+        fetchConsultorios();
         alert("Datos actualizados correctamente");
       } else {
         const errorData = await res.json();
@@ -208,6 +194,29 @@ export function DirectorioPersonal() {
     return filtroTab === tabName
       ? "text-sm font-semibold text-[#1d1d1f] border-b-2 border-[#1d1d1f] pb-4 -mb-4 transition-colors"
       : "text-sm font-medium text-[#86868b] hover:text-[#1d1d1f] pb-4 -mb-4 transition-colors";
+  };
+
+  // DELETE: Dar de baja al personal
+  const handleEliminarPersonal = async (empleado: any) => {
+    const confirmar = window.confirm(`¿Estás seguro de dar de baja a ${empleado.nombre}? Ya no aparecerá en el sistema activo.`);
+    if (!confirmar) return;
+
+    let endpoint = "";
+    if (empleado.tipo === 'doctor') endpoint = `http://localhost:3000/api/doctores/${empleado.id_real}`;
+    else if (empleado.tipo === 'administrativo') endpoint = `http://localhost:3000/api/administrativos/${empleado.id_real}`;
+    else if (empleado.tipo === 'enfermero') endpoint = `http://localhost:3000/api/enfermeros/${empleado.id_real}`;
+    
+    try {
+      const res = await fetch(endpoint, { method: 'DELETE' });
+      if (res.ok) {
+        alert("Personal dado de baja correctamente");
+        fetchEmpleados();
+      } else {
+        alert("Error al dar de baja");
+      }
+    } catch (error) {
+      console.error("Error al eliminar:", error);
+    }
   };
 
   return (
@@ -260,9 +269,9 @@ export function DirectorioPersonal() {
                   onClick={() => setEmpleadoSeleccionado(empleado)}
                   opciones={[
                     { etiqueta: "Ver Perfil", accion: () => setEmpleadoSeleccionado(empleado) },
-                    { etiqueta: "Editar Datos", accion: () => setEmpleadoAEditar({...empleado, rol:empleado.id_especialidad}) },
+                    { etiqueta: "Editar Datos", accion: () => setEmpleadoAEditar(empleado) },
                     { etiqueta: "Asignar Turno", accion: () => alert(`Asignando turno a ${empleado.nombre}`) },
-                    { etiqueta: "Eliminar", accion: () => alert('Ruta de eliminación no configurada en API'), peligro: true }
+                    { etiqueta: "Dar de Baja", accion: () => handleEliminarPersonal(empleado), peligro: true }
                   ]}
                 />
               ))
@@ -286,39 +295,69 @@ export function DirectorioPersonal() {
             onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, nombre: e.target.value })}
           />
 
-          <Select 
-            label="Especialidad Médica" 
-            required 
-            value={nuevoEmpleado.rol}
-            onChange={(e) => setNuevoEmpleado({...nuevoEmpleado, rol: e.target.value})}
-          >
-            <option value="">Seleccione una especialidad...</option>
-            {especialidades.map((esp) => (
-              <option key={esp.id_especialidad} value={esp.id_especialidad}>
-                {esp.nombre}
-              </option>
-            ))}
-          </Select>
-
           <Select
             label="Tipo de Personal"
             value={nuevoEmpleado.tipo}
-            onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, tipo: e.target.value })}
+            onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, tipo: e.target.value, rol: "" })}
           >
             <option value="doctor">Doctor(a)</option>
             <option value="enfermero">Enfermero(a)</option>
             <option value="administrativo">Administrativo</option>
-            <option value="paramedico">Paramédico</option>
           </Select>
 
-          {nuevoEmpleado.tipo === 'doctor' && (
+          {/* Selector Dinámico de Especialidad / Rol */}
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-[#1d1d1f]">
+              {nuevoEmpleado.tipo === 'doctor' ? 'Especialidad Médica' : 
+               nuevoEmpleado.tipo === 'enfermero' ? 'Área de Enfermería' : 'Puesto Administrativo'}
+            </label>
+            <select
+              required
+              className="px-4 py-2.5 bg-gray-50/50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 border border-black/[0.05] shadow-sm w-full"
+              value={nuevoEmpleado.rol}
+              onChange={(e) => setNuevoEmpleado({...nuevoEmpleado, rol: e.target.value})}
+            >
+              <option value="">Seleccionar opción...</option>
+              {nuevoEmpleado.tipo === 'doctor' && (
+                <>
+                  {especialidades.map((esp) => (
+                    <option key={esp.id_especialidad} value={esp.id_especialidad}>
+                      {esp.nombre}
+                    </option>
+                  ))}
+                  <option value="General">Médico General</option>
+                </>
+              )}
+              {nuevoEmpleado.tipo === 'enfermero' && (
+                <>
+                  <option value="Enfermería General">Enfermería General</option>
+                  <option value="UCI">UCI (Cuidados Intensivos)</option>
+                  <option value="Urgencias">Urgencias</option>
+                  <option value="Pediatría">Enfermería Pediátrica</option>
+                </>
+              )}
+              {nuevoEmpleado.tipo === 'administrativo' && (
+                <>
+                  <option value="Recepción">Recepción</option>
+                  <option value="Recursos Humanos">Recursos Humanos</option>
+                  <option value="Contabilidad">Contabilidad</option>
+                  <option value="Sistemas">Sistemas / TI</option>
+                </>
+              )}
+            </select>
+          </div>
+
+          {/* Mostrar campos extra SOLO para Doctores y Enfermeros */}
+          {nuevoEmpleado.tipo !== 'administrativo' && (
             <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Cédula Profesional"
-                placeholder="Ej. 1234567"
-                value={nuevoEmpleado.cedula_profesional}
-                onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, cedula_profesional: e.target.value })}
-              />
+              {nuevoEmpleado.tipo === 'doctor' && (
+                <Input
+                  label="Cédula Profesional"
+                  placeholder="Ej. 1234567"
+                  value={nuevoEmpleado.cedula_profesional}
+                  onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, cedula_profesional: e.target.value })}
+                />
+              )}
               <Input
                 label="Teléfono"
                 placeholder="Ej. 555 123 4567"
@@ -328,24 +367,25 @@ export function DirectorioPersonal() {
               <Input
                 label="Correo Electrónico"
                 type="email"
-                placeholder="Ej. doctor@hospital.com"
+                placeholder="Ej. usuario@hospital.com"
                 value={nuevoEmpleado.correo}
                 onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, correo: e.target.value })}
               />
 
-              {/* Select de Consultorios para Añadir */}
-              <Select
-                label="Consultorio"
-                value={nuevoEmpleado.consultorio}
-                onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, consultorio: e.target.value })}
-              >
-                <option value="">Seleccione un consultorio...</option>
-                {Array.isArray(consultorios) && consultorios.map((cons) => (
-                  <option key={cons.id_consultorio} value={cons.id_consultorio}>
-                    {cons.nombre_consultorio}
-                  </option>
-                ))}
-              </Select>
+              {nuevoEmpleado.tipo === 'doctor' && (
+                <Select
+                  label="Consultorio"
+                  value={nuevoEmpleado.consultorio}
+                  onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, consultorio: e.target.value })}
+                >
+                  <option value="">Seleccione un consultorio...</option>
+                  {Array.isArray(consultorios) && consultorios.map((cons) => (
+                    <option key={cons.id_consultorio} value={cons.id_consultorio}>
+                      {cons.nombre_consultorio}
+                    </option>
+                  ))}
+                </Select>
+              )}
 
               <Input
                 label="Usuario (Sistema)"
@@ -380,19 +420,48 @@ export function DirectorioPersonal() {
               value={empleadoAEditar.nombre || ""}
               onChange={(e) => setEmpleadoAEditar({ ...empleadoAEditar, nombre: e.target.value })}
             />
-            <Select
-              label="Especialidad / Rol"
-              required
-              value={empleadoAEditar.rol || ""}
-              onChange={(e) => setEmpleadoAEditar({ ...empleadoAEditar, rol: e.target.value })}
-            >
-              <option value="">Seleccione una especialidad...</option>
-              {especialidades.map((esp) => (
-                <option key={esp.id_especialidad} value={esp.id_especialidad}>
-                  {esp.nombre}
-                </option>
-              ))}
-            </Select>
+            
+            {/* Selector Dinámico de Especialidad / Rol para Edición */}
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-[#1d1d1f]">
+                {empleadoAEditar.tipo === 'doctor' ? 'Especialidad Médica' : 
+                 empleadoAEditar.tipo === 'enfermero' ? 'Área de Enfermería' : 'Puesto Administrativo'}
+              </label>
+              <select
+                required
+                className="px-4 py-2.5 bg-gray-50/50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 border border-black/[0.05] shadow-sm w-full"
+                value={empleadoAEditar.rol || ''}
+                onChange={(e) => setEmpleadoAEditar({...empleadoAEditar, rol: e.target.value})}
+              >
+                <option value="">Seleccionar opción...</option>
+                {empleadoAEditar.tipo === 'doctor' && (
+                  <>
+                    {especialidades.map((esp) => (
+                      <option key={esp.id_especialidad} value={esp.id_especialidad}>
+                        {esp.nombre}
+                      </option>
+                    ))}
+                    <option value="General">Médico General</option>
+                  </>
+                )}
+                {empleadoAEditar.tipo === 'enfermero' && (
+                  <>
+                    <option value="Enfermería General">Enfermería General</option>
+                    <option value="UCI">UCI (Cuidados Intensivos)</option>
+                    <option value="Urgencias">Urgencias</option>
+                    <option value="Pediatría">Enfermería Pediátrica</option>
+                  </>
+                )}
+                {empleadoAEditar.tipo === 'administrativo' && (
+                  <>
+                    <option value="Recepción">Recepción</option>
+                    <option value="Recursos Humanos">Recursos Humanos</option>
+                    <option value="Contabilidad">Contabilidad</option>
+                    <option value="Sistemas">Sistemas / TI</option>
+                  </>
+                )}
+              </select>
+            </div>
 
             {empleadoAEditar.tipo === 'doctor' && (
               <div className="grid grid-cols-2 gap-4">
@@ -412,8 +481,6 @@ export function DirectorioPersonal() {
                   value={empleadoAEditar.correo || ""}
                   onChange={(e) => setEmpleadoAEditar({ ...empleadoAEditar, correo: e.target.value })}
                 />
-
-                {/*Select de Consultorios para Editar */}
                 <Select
                   label="Consultorio"
                   value={empleadoAEditar.consultorio || ""}
