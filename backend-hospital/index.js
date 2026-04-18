@@ -441,31 +441,11 @@ app.delete('/api/enfermeros/:id', async (req, res) => {
 
 app.get('/api/doctores/estado', async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT d.id_doctor, d.nombre_doctor, e.nombre as especialidad,
-             d.cedula_profesional, d.telefono, d.correo, d.usuario,
-             d.consultorio, 
-             con.nombre_consultorio as nombre_consultorio_asignado, 
-        CASE 
-          WHEN EXISTS (
-            SELECT 1 FROM citas c 
-            WHERE c.id_doctor = d.id_doctor 
-            AND c.fecha = CURRENT_DATE 
-            AND c.hora <= CURRENT_TIME 
-            AND c.hora > CURRENT_TIME - INTERVAL '1 hour'
-            AND c.estado NOT IN ('Cancelada', 'Finalizada')
-          ) THEN 'En Consulta'
-          ELSE d.estado 
-        END as estado_actual
-      FROM doctores d
-      LEFT JOIN especialidades e ON d.id_especialidad = e.id_especialidad
-      LEFT JOIN consultorios con ON d.consultorio = con.id_consultorio 
-      WHERE d.estado != 'Inactivo' 
-    `);
+    const result = await pool.query('SELECT * FROM v_estado_doctores');
     res.json(result.rows);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Fallo al leer la vista de doctores." });
   }
 });
 
@@ -524,16 +504,8 @@ app.route('/api/doctores/:id')
 // ==========================================
 
 app.get('/api/pacientes/completo', async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT p.id_paciente, p.nombre_paciente, p.curp, p.numero_telefono, 
-             p.edad, p.sexo, p.correo, 
-             efp.nombre_estado as estado,
-             TO_CHAR(p.fecha_registro, 'DD-MM-YYYY') as fecha_registro
-      FROM pacientes p 
-      LEFT JOIN estado_flujo_paciente efp ON p.status = efp.id_estado
-      ORDER BY p.id_paciente DESC
-    `);
+  try { //Consultar datos
+    const result = await pool.query('SELECT * FROM v_pacientes_completo');
     res.json(result.rows);
   } catch (error) {
     console.error(error);
@@ -640,16 +612,7 @@ app.put('/api/pacientes/:id/password', async (req, res) => {
 app.route('/api/citas')
   .get(async (req, res) => {
     try {
-      const result = await pool.query(`
-        SELECT c.id_cita, p.nombre_paciente, d.nombre_doctor, con.nombre_consultorio, 
-               TO_CHAR(c.fecha, 'YYYY-MM-DD') as fecha, c.hora, c.estado, c.tipo_cita,
-               c.id_paciente, c.id_doctor, c.id_consultorio
-        FROM citas c
-        JOIN pacientes p ON c.id_paciente = p.id_paciente
-        JOIN doctores d ON c.id_doctor = d.id_doctor
-        LEFT JOIN consultorios con ON c.id_consultorio = con.id_consultorio
-        ORDER BY c.fecha DESC, c.hora DESC
-      `);
+      const result = await pool.query('SELECT * FROM v_citas_detalladas');
       res.json(result.rows);
     } catch (error) {
       console.error(error);
