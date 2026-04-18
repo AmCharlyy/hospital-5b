@@ -9,7 +9,9 @@ import { MenuDropdown } from "./comunes/MenuDropdown";
 export function ModuloPacientes() {
   const [pacientes, setPacientes] = useState<any[]>([]);
   const [busqueda, setBusqueda] = useState("");
-  const [filtroTab, setFiltroTab] = useState<"todos" | "activos" | "bajas">("todos");
+  const [filtroTab, setFiltroTab] = useState<
+    "todos" | "activos" | "bajas" | "en_espera" | "en_tratamiento" | "hospitalizado" | "alta" | "defuncion"
+  >("todos");
 
   const [modalAbierto, setModalAbierto] = useState(false);
   const [modalCredenciales, setModalCredenciales] = useState(false);
@@ -36,26 +38,48 @@ export function ModuloPacientes() {
     try {
       const res = await fetch("http://localhost:3000/api/pacientes/completo");
       const data = await res.json();
-      setPacientes(data);
+      setPacientes(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error al cargar pacientes:", error);
+      setPacientes([]);
     }
   };
 
-  useEffect(() => { fetchPacientes(); }, []);
+  useEffect(() => {
+    let montado = true;
+    const cargar = async () => {
+      try {
+        const res = await fetch("http://localhost:3000/api/pacientes/completo");
+        const data = await res.json();
+        if (montado) setPacientes(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Error al cargar pacientes:", error);
+        if (montado) setPacientes([]);
+      }
+    };
+    cargar();
+    return () => { montado = false; };
+  }, []);
 
-  // Filtrado por tab + búsqueda
   const pacientesFiltrados = pacientes
     .filter(p => {
       const estado = (p.estado || "").toUpperCase();
-      if (filtroTab === "activos") return estado !== "BAJA";
-      if (filtroTab === "bajas") return estado === "BAJA";
-      return true;
+      switch (filtroTab) {
+        case "activos":       return estado !== "BAJA";
+        case "bajas":         return estado === "BAJA";
+        case "en_espera":     return estado === "EN ESPERA";
+       // case "en_tratamiento":return estado === "EN TRATAMIENTO";
+        case "hospitalizado": return estado === "HOSPITALIZADO";
+        case "alta":          return estado === "ALTA";
+        case "defuncion":      return estado === "DEFUNCION";
+        default:              return true;
+      }
     })
-    .filter(p =>
-      p.nombre_paciente.toLowerCase().includes(busqueda.toLowerCase()) ||
-      p.curp.toLowerCase().includes(busqueda.toLowerCase())
-    );
+    .filter(p => {
+      const term = busqueda.toLowerCase();
+      return (p.nombre_paciente || "").toLowerCase().includes(term) ||
+             (p.curp || "").toLowerCase().includes(term);
+    });
 
   // --- 1. POST: Registrar Paciente ---
   const handleRegistrarPaciente = async (e: React.FormEvent) => {
@@ -190,26 +214,71 @@ export function ModuloPacientes() {
     }
   };
 
-  // Colores de estado — BAJA siempre rojo pastel
-  const colorEstado = (estado: string) => {
+  // Colores de estado — refleja los estados reales de estado_flujo_paciente
+  const colorEstado = (estado: string): string => {
     switch (estado) {
-      case "EN ESPERA": return "bg-yellow-100 text-yellow-700";
-      //case "":                 return "bg-blue-100 text-blue-700";
-      case "DEFUCION": return "bg-purple-100 text-purple-700";
-      case "ALTA": return "bg-blue-100 text-blue-700";
-      case "BAJA": return "bg-indigo-100 text-indigo-700";
-      case "EN TRATAMIENTO": return "bg-green-100 text-green-700";
-      //case "BAJA":             return "bg-red-100 text-red-600";
-      //case "":
-      case "HOSPITALIZADO": return "bg-red-100 text-red-600";
-      default: return "bg-gray-100 text-gray-600";
+      case "EN ESPERA":      return "bg-yellow-100 text-yellow-700";
+      case "ALTA":           return "bg-blue-100 text-blue-700";
+      case "DEFUNCION":       return "bg-gray-100 text-gray-600";
+     //case "EN TRATAMIENTO": return "bg-green-100 text-green-700";
+      case "HOSPITALIZADO":  return "bg-indigo-100 text-indigo-700";
+      case "BAJA":           return "bg-red-100 text-red-600";
+      default:               return "bg-purple-100 text-purple-700";
     }
   };
 
-  const tabs: { key: "todos" | "activos" | "bajas"; label: string }[] = [
-    { key: "todos", label: "Todos" },
-    { key: "activos", label: "Activos" },
-    { key: "bajas", label: "Bajas" },
+  // Contadores por estado para los badges de cada tab
+  const contarEstado = (estado: string) =>
+    pacientes.filter(p => (p.estado || "").toUpperCase() === estado).length;
+
+  const tabs: {
+    key: "todos" | "activos" | "bajas" | "en_espera" | "en_tratamiento" | "hospitalizado" | "alta" | "defuncion";
+    label: string;
+    badge?: number;
+    badgeColor?: string;
+  }[] = [
+    {
+      key: "todos",
+      label: "Todos",
+      badge: pacientes.length,
+      badgeColor: "bg-gray-100 text-gray-600",
+    },
+    {
+      key: "activos",
+      label: "Activos",
+      badge: pacientes.filter(p => (p.estado || "").toUpperCase() !== "BAJA").length,
+      badgeColor: "bg-green-100 text-green-700",
+    },
+    {
+      key: "en_espera",
+      label: "En espera",
+      badge: contarEstado("EN ESPERA"),
+      badgeColor: "bg-yellow-100 text-yellow-700",
+    },
+    {
+      key: "hospitalizado",
+      label: "Hospitalizado",
+      badge: contarEstado("HOSPITALIZADO"),
+      badgeColor: "bg-indigo-100 text-indigo-700",
+    },
+    {
+      key: "alta",
+      label: "Alta",
+      badge: contarEstado("ALTA"),
+      badgeColor: "bg-blue-100 text-blue-700",
+    },
+    {
+      key: "defuncion",
+      label: "Defunción",
+      badge: contarEstado("DEFUNCION"),
+      badgeColor: "bg-gray-100 text-gray-700",
+    },
+    {
+      key: "bajas",
+      label: "Bajas",
+      badge: contarEstado("BAJA"),
+      badgeColor: "bg-red-100 text-red-600",
+    },
   ];
 
   return (
@@ -239,20 +308,21 @@ export function ModuloPacientes() {
       </header>
 
       {/* TABS */}
-      <div className="flex gap-1 border-b border-black/[0.06]">
+      <div className="flex gap-0.5 border-b border-black/[0.06] overflow-x-auto">
         {tabs.map(tab => (
           <button
             key={tab.key}
             onClick={() => setFiltroTab(tab.key)}
-            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${filtroTab === tab.key
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+              filtroTab === tab.key
                 ? "border-blue-500 text-blue-600"
                 : "border-transparent text-[#86868b] hover:text-[#1d1d1f]"
-              }`}
+            }`}
           >
             {tab.label}
-            {tab.key === "bajas" && (
-              <span className="ml-2 text-xs bg-red-100 text-red-600 font-semibold px-1.5 py-0.5 rounded-full">
-                {pacientes.filter(p => (p.estado || "").toUpperCase() === "BAJA").length}
+            {tab.badge !== undefined && tab.badge > 0 && (
+              <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${tab.badgeColor}`}>
+                {tab.badge}
               </span>
             )}
           </button>
@@ -308,16 +378,15 @@ export function ModuloPacientes() {
                       <MenuDropdown
                         opciones={[
                           { etiqueta: "Ver Expediente", accion: () => setPacienteSeleccionado(paciente) },
-                          !esBaja && { etiqueta: "Editar Datos", accion: () => setPacienteAEditar(paciente) },
-                          !esBaja && { etiqueta: "Generar Nueva Contraseña", accion: () => handleNuevaContrasena(paciente) },
-                          !esBaja && estadoVisual === "ATENCIÓN MÉDICA" && {
-                            etiqueta: "Dar de Alta",
-                            accion: () => cambiarEstadoPaciente(paciente.id_paciente, 4)
-                          },
+                          !esBaja ? { etiqueta: "Editar Datos", accion: () => setPacienteAEditar(paciente) } : null,
+                          !esBaja ? { etiqueta: "Generar Nueva Contraseña", accion: () => handleNuevaContrasena(paciente) } : null,
+                          (!esBaja && estadoVisual === "ALTA")
+                            ? { etiqueta: "Dar de Alta", accion: () => cambiarEstadoPaciente(paciente.id_paciente, 4) }
+                            : null,
                           esBaja
                             ? { etiqueta: "Reingresar (En Espera)", accion: () => cambiarEstadoPaciente(paciente.id_paciente, 1) }
                             : { etiqueta: "Dar de Baja", accion: () => setConfirmandoBaja(paciente), peligro: true },
-                        ].filter(Boolean) as any}
+                        ].filter((o): o is NonNullable<typeof o> => o !== null)}
                       />
                     </td>
                   </tr>
@@ -474,15 +543,20 @@ export function ModuloPacientes() {
               <p className="text-[#86868b] font-mono mt-1">{pacienteSeleccionado.curp}</p>
             </div>
             <div className="bg-gray-50 p-4 rounded-2xl border border-black/[0.05] space-y-3">
-              {[
-                ["Estado", <span className={`text-xs font-semibold uppercase tracking-wider px-2 py-1 rounded-md ${colorEstado((pacienteSeleccionado.estado || "").toUpperCase())}`}>{pacienteSeleccionado.estado || "N/A"}</span>],
-                ["Folio", `P-${pacienteSeleccionado.id_paciente}`],
-                ["Teléfono", `${pacienteSeleccionado.codigo_pais || "+52"} ${pacienteSeleccionado.numero_telefono}`],
-                ["Correo", pacienteSeleccionado.correo || "N/A"],
-                ["Edad / Sexo", `${pacienteSeleccionado.edad || "N/A"} años / ${pacienteSeleccionado.sexo || "N/A"}`],
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-[#86868b]">Estado</span>
+                <span className={`text-xs font-semibold uppercase tracking-wider px-2 py-1 rounded-md ${colorEstado((pacienteSeleccionado.estado || "").toUpperCase())}`}>
+                  {pacienteSeleccionado.estado || "N/A"}
+                </span>
+              </div>
+              {([
+                ["Folio",            `P-${pacienteSeleccionado.id_paciente}`],
+                ["Teléfono",         `${pacienteSeleccionado.codigo_pais || "+52"} ${pacienteSeleccionado.numero_telefono}`],
+                ["Correo",           pacienteSeleccionado.correo || "N/A"],
+                ["Edad / Sexo",      `${pacienteSeleccionado.edad || "N/A"} años / ${pacienteSeleccionado.sexo || "N/A"}`],
                 ["Fecha de Registro", pacienteSeleccionado.fecha_registro || "N/A"],
-              ].map(([label, value]) => (
-                <div key={label as string} className="flex justify-between items-center">
+              ] as [string, string][]).map(([label, value]) => (
+                <div key={label} className="flex justify-between items-center">
                   <span className="text-sm text-[#86868b]">{label}</span>
                   <span className="text-sm font-medium text-[#1d1d1f]">{value}</span>
                 </div>
