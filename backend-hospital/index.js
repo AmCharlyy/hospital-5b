@@ -347,32 +347,7 @@ app.get('/api/especialidades', async (req, res) => {
 // --- PERSONAL UNIFICADO: Directorio General ---
 app.get('/api/personal/completo', async (req, res) => {
   try {
-    const result = await pool.query(`
-      -- 1. Doctores
-      SELECT d.id_doctor as id_real, d.nombre_doctor as nombre, e.nombre as especialidad,
-             d.cedula_profesional, d.telefono, d.correo, d.usuario,
-             'doctor' as tipo, d.estado as estado_actual
-      FROM doctores d
-      LEFT JOIN especialidades e ON d.id_especialidad = e.id_especialidad
-      WHERE d.estado != 'Inactivo'
-
-      UNION ALL
-
-      -- 2. Administrativos (Adaptado a tus 4 columnas exactas)
-      SELECT a.id as id_real, a.nombre as nombre, a.puesto as especialidad,
-             '' as cedula_profesional, '' as telefono, '' as correo, '' as usuario,
-             'administrativo' as tipo, 'Activo' as estado_actual
-      FROM administrativos a
-
-      UNION ALL
-
-      -- 3. Enfermeros (Conecta perfecto con tu tabla)
-      SELECT id_enfermero as id_real, nombre_enfermero as nombre, 'Enfermería' as especialidad,
-             '' as cedula_profesional, telefono, correo, usuario,
-             'enfermero' as tipo, estado as estado_actual
-      FROM enfermeros
-      WHERE estado != 'Inactivo'
-    `);
+    const result = await pool.query('SELECT * FROM v_personal_completo');
     res.json(result.rows);
   } catch (error) {
     console.error(error);
@@ -621,7 +596,7 @@ app.put('/api/pacientes/:id/password', async (req, res) => {
 app.route('/api/citas')
   .get(async (req, res) => {
     try {
-      const result = await pool.query('SELECT * FROM vista_citas_detalles');
+      const result = await pool.query('SELECT * FROM v_citas_detalles');
       res.json(result.rows);
     } catch (error) {
       console.error(error);
