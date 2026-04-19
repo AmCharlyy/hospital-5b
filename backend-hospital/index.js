@@ -9,7 +9,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
  
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3333;
  
 async function enviarWhatsApp(telefono, nombrePlantilla, variables, idioma = "es_MX") {
   const WA_PHONE_ID = process.env.WA_PHONE_ID;

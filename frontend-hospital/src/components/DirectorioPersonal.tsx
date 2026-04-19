@@ -36,7 +36,7 @@ export function DirectorioPersonal() {
   // 1. Conexión al Backend (GET) - Empleados
   const fetchEmpleados = async () => {
     try {
-      const res = await fetch("http://localhost:3000/api/personal/completo");
+      const res = await fetch("http://localhost:3333/api/personal/completo");
       const data = await res.json();
       
       const personalFormateado = data.map((emp: any) => {
@@ -67,7 +67,7 @@ export function DirectorioPersonal() {
   // 2. Conexión al Backend (GET) - Consultorios Disponibles
   const fetchConsultorios = async () => {
     try {
-      const res = await fetch("http://localhost:3000/api/consultorios-disponibles");
+      const res = await fetch("http://localhost:3333/api/consultorios-disponibles");
       const data = await res.json();
       if (Array.isArray(data)) {
         setConsultorios(data);
@@ -82,7 +82,7 @@ export function DirectorioPersonal() {
   // 3. Conexion Especialidades
   const fetchEspecialidades = async () => {
     try {
-      const res = await fetch("http://localhost:3000/api/especialidades");
+      const res = await fetch("http://localhost:3333/api/especialidades");
       const data = await res.json();
       setEspecialidades(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -115,9 +115,9 @@ export function DirectorioPersonal() {
   const handleCrear = async (e: React.FormEvent) => {
     e.preventDefault();
     let endpoint = "";
-    if (nuevoEmpleado.tipo === 'doctor') endpoint = "http://localhost:3000/api/doctores";
-    else if (nuevoEmpleado.tipo === 'administrativo') endpoint = "http://localhost:3000/api/administrativos";
-    else if (nuevoEmpleado.tipo === 'enfermero') endpoint = "http://localhost:3000/api/enfermeros";
+    if (nuevoEmpleado.tipo === 'doctor') endpoint = "http://localhost:3333/api/doctores";
+    else if (nuevoEmpleado.tipo === 'administrativo') endpoint = "http://localhost:3333/api/administrativos";
+    else if (nuevoEmpleado.tipo === 'enfermero') endpoint = "http://localhost:3333/api/enfermeros";
 
     if (!endpoint) return alert("Ruta no configurada para este rol.");
     
@@ -160,7 +160,7 @@ export function DirectorioPersonal() {
     if (!empleadoAEditar) return;
 
     try {
-      const res = await fetch(`http://localhost:3000/api/doctores/${empleadoAEditar.id_real}`, {
+      const res = await fetch(`http://localhost:3333/api/doctores/${empleadoAEditar.id_real}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -202,9 +202,9 @@ export function DirectorioPersonal() {
     if (!confirmar) return;
 
     let endpoint = "";
-    if (empleado.tipo === 'doctor') endpoint = `http://localhost:3000/api/doctores/${empleado.id_real}`;
-    else if (empleado.tipo === 'administrativo') endpoint = `http://localhost:3000/api/administrativos/${empleado.id_real}`;
-    else if (empleado.tipo === 'enfermero') endpoint = `http://localhost:3000/api/enfermeros/${empleado.id_real}`;
+    if (empleado.tipo === 'doctor') endpoint = `http://localhost:3333/api/doctores/${empleado.id_real}`;
+    else if (empleado.tipo === 'administrativo') endpoint = `http://localhost:3333/api/administrativos/${empleado.id_real}`;
+    else if (empleado.tipo === 'enfermero') endpoint = `http://localhost:3333/api/enfermeros/${empleado.id_real}`;
     
     try {
       const res = await fetch(endpoint, { method: 'DELETE' });

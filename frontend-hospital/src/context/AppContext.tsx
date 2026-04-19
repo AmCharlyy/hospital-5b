@@ -40,7 +40,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const fetchAuxiliares = async () => {
     try {
-      const res = await fetch('http://localhost:3000/api/auxiliares');
+      const res = await fetch('http://localhost:3333/api/auxiliares');
       if (!res.ok) throw new Error('Error al obtener auxiliares');
       const data: Auxiliar[] = await res.json();
       setAuxiliares(data);
@@ -51,7 +51,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addAuxiliar = async (auxiliar: Omit<Auxiliar, 'id_auxiliar'>) => {
     try {
-      const res = await fetch('http://localhost:3000/api/auxiliares', {
+      const res = await fetch('http://localhost:3333/api/auxiliares', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(auxiliar),
@@ -67,7 +67,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updateAuxiliar = async (id: number, auxiliar: Partial<Auxiliar>) => {
     try {
-      const res = await fetch(`http://localhost:3000/api/auxiliares/${id}`, {
+      const res = await fetch(`http://localhost:3333/api/auxiliares/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(auxiliar),
@@ -83,7 +83,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const deleteAuxiliar = async (id: number) => {
     try {
-      const res = await fetch(`http://localhost:3000/api/auxiliares/${id}`, {
+      const res = await fetch(`http://localhost:3333/api/auxiliares/${id}`, {
         method: 'DELETE',
       });
       if (!res.ok) throw await res.json();

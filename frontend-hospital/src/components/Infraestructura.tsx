@@ -48,7 +48,7 @@ export function Infraestructura() {
   // --- FETCH A LA BASE DE DATOS ---
   const fetchConsultorios = async () => {
     try {
-      const res = await fetch("http://localhost:3000/api/consultorios");
+      const res = await fetch("http://localhost:3333/api/consultorios");
       const data = await res.json();
       
       // Mapeamos los datos de la BD para que coincidan con la UI que diseñaste
