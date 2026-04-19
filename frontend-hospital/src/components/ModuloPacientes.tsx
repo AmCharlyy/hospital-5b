@@ -68,7 +68,6 @@ export function ModuloPacientes() {
         case "activos":       return estado !== "BAJA";
         case "bajas":         return estado === "BAJA";
         case "en_espera":     return estado === "EN ESPERA";
-       // case "en_tratamiento":return estado === "EN TRATAMIENTO";
         case "hospitalizado": return estado === "HOSPITALIZADO";
         case "alta":          return estado === "ALTA";
         case "defuncion":      return estado === "DEFUNCION";
@@ -218,12 +217,11 @@ export function ModuloPacientes() {
   const colorEstado = (estado: string): string => {
     switch (estado) {
       case "EN ESPERA":      return "bg-yellow-100 text-yellow-700";
-      case "ALTA":           return "bg-blue-100 text-blue-700";
-      case "DEFUNCION":       return "bg-gray-100 text-gray-600";
-     //case "EN TRATAMIENTO": return "bg-green-100 text-green-700";
-      case "HOSPITALIZADO":  return "bg-indigo-100 text-indigo-700";
-      case "BAJA":           return "bg-red-100 text-red-600";
-      default:               return "bg-purple-100 text-purple-700";
+      case "ALTA":           return "bg-blue-100 text-blue-700";    
+      case "DEFUNCION":       return "bg-gray-200 text-gray-600";
+      case "HOSPITALIZADO":  return "bg-red-hospital/20 text-dark-red-hospital"; //indigo-100 text-indigo-700 
+      case "BAJA":           return "bg-brand-green/20 text-brand-green-dark";
+      default:               return "bg-purple-100 text-purple-800";
     }
   };
 
@@ -259,7 +257,7 @@ export function ModuloPacientes() {
       key: "hospitalizado",
       label: "Hospitalizado",
       badge: contarEstado("HOSPITALIZADO"),
-      badgeColor: "bg-indigo-100 text-indigo-700",
+      badgeColor: "bg-red-hospital/20 text-dark-red-hospital",
     },
     {
       key: "alta",
@@ -271,19 +269,20 @@ export function ModuloPacientes() {
       key: "defuncion",
       label: "Defunción",
       badge: contarEstado("DEFUNCION"),
-      badgeColor: "bg-gray-100 text-gray-700",
+      badgeColor: "bg-gray-200 text-gray-700",
     },
     {
       key: "bajas",
       label: "Bajas",
       badge: contarEstado("BAJA"),
-      badgeColor: "bg-red-100 text-red-600",
+      badgeColor: "bg-brand-green/20 text-brand-green-dark",
     },
   ];
 
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
 
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
+ 
       {/* HEADER */}
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
@@ -306,7 +305,7 @@ export function ModuloPacientes() {
           </Boton>
         </div>
       </header>
-
+ 
       {/* TABS */}
       <div className="flex gap-0.5 border-b border-black/[0.06] overflow-x-auto">
         {tabs.map(tab => (
@@ -328,7 +327,7 @@ export function ModuloPacientes() {
           </button>
         ))}
       </div>
-
+ 
       {/* TABLA */}
       <div className="bg-white rounded-3xl shadow-[0_2px_20px_rgba(0,0,0,0.02)] border border-black/[0.02] overflow-hidden">
         <div className="overflow-x-auto">
@@ -346,15 +345,15 @@ export function ModuloPacientes() {
               {pacientesFiltrados.map((paciente) => {
                 const estadoVisual = (paciente.estado || "EN ESPERA").toUpperCase();
                 const esBaja = estadoVisual === "BAJA";
-
+                
                 return (
                   <tr
                     key={paciente.id_paciente}
-                    className={`transition-colors group ${esBaja ? "bg-red-50/40 hover:bg-red-50/70" : "hover:bg-gray-50/50"}`}
+                    className="transition-colors group hover:bg-gray-50/50"
                   >
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className={`font-semibold ${esBaja ? "text-red-800/80" : "text-[#1d1d1f]"}`}>
+                        <span className="font-semibold text-[#1d1d1f]">
                           {paciente.nombre_paciente}
                         </span>
                         <span className="text-xs text-[#86868b]">Folio: P-{paciente.id_paciente}</span>
@@ -362,7 +361,7 @@ export function ModuloPacientes() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <Fingerprint className={`w-4 h-4 ${esBaja ? "text-red-300" : "text-[#86868b]"}`} />
+                        <Fingerprint className="w-4 h-4 text-[#86868b]" />
                         <span className="text-sm font-mono text-[#1d1d1f]">{paciente.curp}</span>
                       </div>
                     </td>
@@ -403,7 +402,7 @@ export function ModuloPacientes() {
           </table>
         </div>
       </div>
-
+ 
       {/* ── MODAL: Confirmar Baja ── */}
       <Modal isOpen={!!confirmandoBaja} onClose={() => setConfirmandoBaja(null)} titulo="Confirmar baja del paciente">
         {confirmandoBaja && (
@@ -433,7 +432,7 @@ export function ModuloPacientes() {
           </div>
         )}
       </Modal>
-
+ 
       {/* ── MODAL: Registro ── */}
       <Modal isOpen={modalAbierto} onClose={() => setModalAbierto(false)} titulo="Registrar Nuevo Paciente">
         <form onSubmit={handleRegistrarPaciente} className="space-y-4">
@@ -492,7 +491,7 @@ export function ModuloPacientes() {
           </div>
         </form>
       </Modal>
-
+ 
       {/* ── MODAL: Credenciales ── */}
       <Modal isOpen={modalCredenciales} onClose={() => setModalCredenciales(false)} titulo="Acceso Generado Exitosamente">
         <div className="space-y-6 text-center">
@@ -533,7 +532,7 @@ export function ModuloPacientes() {
           </div>
         </div>
       </Modal>
-
+ 
       {/* ── MODAL: Expediente ── */}
       <Modal isOpen={!!pacienteSeleccionado} onClose={() => setPacienteSeleccionado(null)} titulo="Expediente del Paciente">
         {pacienteSeleccionado && (
@@ -569,7 +568,7 @@ export function ModuloPacientes() {
           </div>
         )}
       </Modal>
-
+ 
       {/* ── MODAL: Edición ── */}
       <Modal isOpen={!!pacienteAEditar} onClose={() => setPacienteAEditar(null)} titulo="Editar Datos del Paciente">
         {pacienteAEditar && (
@@ -622,7 +621,7 @@ export function ModuloPacientes() {
           </form>
         )}
       </Modal>
-
+ 
     </motion.div>
   );
 }
