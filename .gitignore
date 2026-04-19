@@ -1,0 +1,12 @@
+# Ignorar dependencias de ambos
+**/node_modules/
+
+# --- SEGURIDAD: Esto es lo más importante ---
+**/.env
+**/.env.local
+**/.env.development.local
+
+# Ignorar archivos de sistema y carpetas de build
+.DS_Store
+**/dist/
+**/build/
