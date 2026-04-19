@@ -621,7 +621,7 @@ app.put('/api/pacientes/:id/password', async (req, res) => {
 app.route('/api/citas')
   .get(async (req, res) => {
     try {
-      const result = await pool.query('SELECT * FROM vista_citas_detalles');
+      const result = await pool.query('SELECT * FROM v_citas_detalles');
       res.json(result.rows);
     } catch (error) {
       console.error(error);
