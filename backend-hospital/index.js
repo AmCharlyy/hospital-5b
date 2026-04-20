@@ -499,20 +499,32 @@ app.route('/api/pacientes')
     if (!nombre_paciente || !curp || !numero_telefono || !contrasena_plana) {
       return res.status(400).json({ error: "Faltan datos obligatorios." });
     }
-
+ 
     try {
+      const estadoRes = await pool.query(
+        `SELECT id_estado FROM estado_flujo_paciente WHERE nombre_estado ILIKE 'EN ESPERA' LIMIT 1`
+      );
+      if (estadoRes.rows.length === 0) {
+        return res.status(500).json({ error: "No existe el estado 'EN ESPERA' en estado_flujo_paciente." });
+      }
+      const idEnEspera = estadoRes.rows[0].id_estado;
+ 
       const contrasenaHasheada = await bcrypt.hash(contrasena_plana, 10);
       const nuevoPaciente = await pool.query(
         `INSERT INTO pacientes 
          (nombre_paciente, curp, numero_telefono, edad, sexo, correo, status, contrasena, num_expediente) 
-         VALUES ($1, $2, $3, $4, $5, $6, 1, $7, (SELECT COALESCE(MAX(num_expediente), 0) + 1 FROM pacientes)) RETURNING *`,
-        [nombre_paciente, curp, numero_telefono, edad, sexo, correo, contrasenaHasheada]
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
+                 (SELECT COALESCE(MAX(num_expediente), 0) + 1 FROM pacientes)) RETURNING *`,
+        [nombre_paciente, curp, numero_telefono, edad, sexo, correo, idEnEspera, contrasenaHasheada]
       );
-
-      let telPaciente = String(numero_telefono);
-      if (!telPaciente.startsWith("52")) telPaciente = "52" + telPaciente;
-      enviarWhatsApp(telPaciente, "bienvenida_paciente", [nombre_paciente, curp, contrasena_plana], "es");
-
+ 
+      try {
+        const tel = formatearTelefono(numero_telefono);
+        enviarWhatsApp(tel, "bienvenida_paciente", [nombre_paciente, curp], "es");
+      } catch (waErr) {
+        console.warn("WhatsApp no enviado:", waErr.message);
+      }
+ 
       res.status(201).json(nuevoPaciente.rows[0]);
     } catch (error) {
       console.error(error);
