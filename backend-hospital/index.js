@@ -344,6 +344,7 @@ app.get('/api/especialidades', async (req, res) => {
 // ==========================================
 // --- 3. PERSONAL: Doctores ---
 // ==========================================
+
 // --- PERSONAL UNIFICADO: Directorio General ---
 app.get('/api/personal/completo', async (req, res) => {
   try {
@@ -354,6 +355,7 @@ app.get('/api/personal/completo', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
 
 // --- ADMINISTRATIVOS ---
 app.post('/api/administrativos', async (req, res) => {
@@ -551,24 +553,25 @@ app.put('/api/pacientes/:id/estado', async (req, res) => {
 
 app.put('/api/pacientes/:id/baja', async (req, res) => {
   const { id } = req.params;
-  
+
   try {
-    const queryId = await pool.query("SELECT id_estado FROM status WHERE nombre_estado ILIKE 'BAJA'");
-    
+    const queryId = await pool.query(
+      `SELECT id_status FROM status WHERE status ILIKE 'BAJA' LIMIT 1`
+    );
     if (queryId.rows.length === 0) {
-      return res.status(404).json({ error: "No existe el estado 'BAJA' en tu tabla status." });
+      return res.status(404).json({ error: "No existe el estado 'BAJA' en la tabla status." });
     }
 
-    const idBaja = queryId.rows[0].id_estado;
-
-    // 2. Ahora usamos ese ID dinámico
+    const idBaja = queryId.rows[0].id_status;
     const result = await pool.query(
-      'UPDATE pacientes SET status = $1 WHERE id_paciente = $2 RETURNING *', 
+      'UPDATE pacientes SET status = $1 WHERE id_paciente = $2 RETURNING *',
       [idBaja, id]
     );
 
+    if (result.rowCount === 0) return res.status(404).json({ error: "Paciente no encontrado." });
     res.json({ message: "Paciente dado de baja exitosamente." });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: error.message });
   }
 });
