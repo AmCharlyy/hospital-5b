@@ -60,7 +60,7 @@ app.route('/api/consultorios')
   .get(async (req, res) => {
     try {
       const result = await pool.query(`
-        SELECT * FROM vista_estado_consultorios 
+        SELECT * FROM v_estado_consultorios 
         ORDER BY id_consultorio DESC
       `);
       res.json(result.rows);
@@ -89,7 +89,7 @@ app.route('/api/consultorios')
 app.get('/api/consultorios-disponibles', async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT * FROM vista_consultorios_disponibles 
+      SELECT * FROM v_consultorios_disponibles 
       ORDER BY id_consultorio ASC
     `);
     res.json(result.rows);
@@ -148,7 +148,7 @@ app.route('/api/habitaciones')
   .get(async (req, res) => {
     try {
       const result = await pool.query(`
-        SELECT * FROM vista_habitaciones_disponibles 
+        SELECT * FROM v_habitaciones_disponibles 
         ORDER BY piso ASC, numero_habitacion ASC
       `);
       res.json(result.rows);
