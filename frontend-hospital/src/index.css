@@ -23,3 +23,21 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 }
+
+/* Eliminar flechas de inputs numéricos en TODOS los navegadores */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+
+input[type=number] {
+  -moz-appearance: textfield !important; /* Firefox */
+}
+
+/* Si las flechitas salen en un SELECT (a veces pasa en sistemas Apple/Safari) */
+select {
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+}
