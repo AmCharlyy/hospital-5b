@@ -3,20 +3,20 @@ const cors = require('cors');
 const bcrypt = require('bcrypt');
 require('dotenv').config();
 const pool = require('./db');
- 
+
 const app = express();
- 
+
 app.use(cors());
 app.use(express.json());
- 
+
 const PORT = process.env.PORT || 3333;
- 
+
 async function enviarWhatsApp(telefono, nombrePlantilla, variables, idioma = "es_MX") {
   const WA_PHONE_ID = process.env.WA_PHONE_ID;
   const WA_TOKEN = process.env.WA_TOKEN;
- 
+
   const parameters = variables.map(text => ({ type: "text", text: String(text) }));
- 
+
   const data = {
     messaging_product: "whatsapp",
     to: telefono,
@@ -27,12 +27,12 @@ async function enviarWhatsApp(telefono, nombrePlantilla, variables, idioma = "es
       components: [{ type: "body", parameters }]
     }
   };
- 
+
   console.log("----------------------------------------");
   console.log("📢 ENVIANDO WHATSAPP A:", telefono);
   console.log("📢 LARGO DEL NÚMERO:", telefono.length, "dígitos");
   console.log("----------------------------------------");
- 
+
   try {
     const response = await fetch(`https://graph.facebook.com/v18.0/${WA_PHONE_ID}/messages`, {
       method: "POST",
@@ -42,7 +42,7 @@ async function enviarWhatsApp(telefono, nombrePlantilla, variables, idioma = "es
       },
       body: JSON.stringify(data)
     });
- 
+
     const result = await response.json();
     if (result.error) console.error("Error de WhatsApp:", result.error.message);
     else console.log("WhatsApp enviado con éxito a", telefono);
@@ -60,18 +60,7 @@ app.route('/api/consultorios')
   .get(async (req, res) => {
     try {
       const result = await pool.query(`
-        SELECT 
-          id_consultorio as id_ui, 
-          nombre_consultorio as nombre, 
-          id_consultorio, 
-          nombre_consultorio, 
-          piso, 
-          edificio, 
-          disponible, 
-          id_area,
-          CASE WHEN disponible = true THEN 'disponible' ELSE 'ocupada' END as estado, 
-          'Consultorio' as tipo 
-        FROM consultorios
+        SELECT * FROM vista_estado_consultorios 
         ORDER BY id_consultorio DESC
       `);
       res.json(result.rows);
@@ -100,9 +89,7 @@ app.route('/api/consultorios')
 app.get('/api/consultorios-disponibles', async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT id_consultorio, nombre_consultorio 
-      FROM consultorios 
-      WHERE disponible = true
+      SELECT * FROM vista_consultorios_disponibles 
       ORDER BY id_consultorio ASC
     `);
     res.json(result.rows);
@@ -161,7 +148,7 @@ app.route('/api/habitaciones')
   .get(async (req, res) => {
     try {
       const result = await pool.query(`
-        SELECT * FROM habitaciones 
+        SELECT * FROM vista_habitaciones_disponibles 
         ORDER BY piso ASC, numero_habitacion ASC
       `);
       res.json(result.rows);
@@ -359,7 +346,7 @@ app.get('/api/personal/completo', async (req, res) => {
 
 // --- ADMINISTRATIVOS ---
 app.post('/api/administrativos', async (req, res) => {
-  const { nombre } = req.body; 
+  const { nombre } = req.body;
   if (!nombre) return res.status(400).json({ error: "El nombre es obligatorio." });
 
   try {
@@ -499,7 +486,7 @@ app.route('/api/pacientes')
     if (!nombre_paciente || !curp || !numero_telefono || !contrasena_plana) {
       return res.status(400).json({ error: "Faltan datos obligatorios." });
     }
- 
+
     try {
       const estadoRes = await pool.query(
         `SELECT id_estado FROM estado_flujo_paciente WHERE nombre_estado ILIKE 'EN ESPERA' LIMIT 1`
@@ -508,7 +495,7 @@ app.route('/api/pacientes')
         return res.status(500).json({ error: "No existe el estado 'EN ESPERA' en estado_flujo_paciente." });
       }
       const idEnEspera = estadoRes.rows[0].id_estado;
- 
+
       const contrasenaHasheada = await bcrypt.hash(contrasena_plana, 10);
       const nuevoPaciente = await pool.query(
         `INSERT INTO pacientes 
@@ -517,14 +504,14 @@ app.route('/api/pacientes')
                  (SELECT COALESCE(MAX(num_expediente), 0) + 1 FROM pacientes)) RETURNING *`,
         [nombre_paciente, curp, numero_telefono, edad, sexo, correo, idEnEspera, contrasenaHasheada]
       );
- 
+
       try {
         const tel = formatearTelefono(numero_telefono);
         enviarWhatsApp(tel, "bienvenida_paciente", [nombre_paciente, curp], "es");
       } catch (waErr) {
         console.warn("WhatsApp no enviado:", waErr.message);
       }
- 
+
       res.status(201).json(nuevoPaciente.rows[0]);
     } catch (error) {
       console.error(error);
