@@ -378,6 +378,8 @@ app.post('/api/administrativos', async (req, res) => {
 // --- ENFERMEROS ---
 app.post('/api/enfermeros', async (req, res) => {
   const { nombre, telefono, correo, usuario, contrasena } = req.body;
+  if (!nombre || !contrasena) return res.status(400).json({ error: "Faltan datos obligatorios." });
+
   try {
     const contrasenaHasheada = await bcrypt.hash(contrasena, 10);
     const nuevoEnf = await pool.query(
@@ -390,6 +392,7 @@ app.post('/api/enfermeros', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
 
 // --- ENFERMEROS ---
 app.post('/api/enfermeros', async (req, res) => {
