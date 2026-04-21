@@ -66,7 +66,7 @@ export default function App() {
           >
             <BarraLateral pestanaActiva={pestanaActiva} setPestanaActiva={setPestanaActiva} />
             
-            <main className="flex-1 ml-64 p-8 lg:p-12 overflow-y-auto">
+            <main className="flex-1 ml-64 p-8 lg:p-12 overflow-visible">
               <div className="max-w-7xl mx-auto">
                 <AnimatePresence mode="wait">
                   {pestanaActiva === "pacientes" && <ModuloPacientes key="pacientes" />}

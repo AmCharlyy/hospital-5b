@@ -380,23 +380,6 @@ app.post('/api/enfermeros', async (req, res) => {
   }
 });
 
-
-// --- ENFERMEROS ---
-app.post('/api/enfermeros', async (req, res) => {
-  const { nombre, telefono, correo, usuario, contrasena } = req.body;
-  try {
-    const contrasenaHasheada = await bcrypt.hash(contrasena, 10);
-    const nuevoEnf = await pool.query(
-      `INSERT INTO enfermeros (nombre_enfermero, telefono, correo, usuario, contrasena, estado) 
-       VALUES ($1, $2, $3, $4, $5, 'Activo') RETURNING *`,
-      [nombre, telefono, correo, usuario, contrasenaHasheada]
-    );
-    res.status(201).json(nuevoEnf.rows[0]);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
 app.delete('/api/enfermeros/:id', async (req, res) => {
   try {
     await pool.query("UPDATE enfermeros SET estado = 'Inactivo' WHERE id_enfermero = $1", [req.params.id]);

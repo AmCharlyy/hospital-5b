@@ -19,12 +19,15 @@ export function BarraLateral({ pestanaActiva, setPestanaActiva }: Props) {
   return (
     <aside className="w-64 h-screen fixed left-0 top-0 p-6 flex flex-col bg-[#f5f5f7]">
       <div className="flex items-center gap-3 px-2 mb-10">
-        <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center shadow-sm">
-          <Activity className="w-5 h-5 text-white" />
+        <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm border border-black/[0.05] overflow-hidden">
+          <img 
+            src="https://i.postimg.cc/13NcVHWy/LOGO.png" 
+            alt="CHEPA'S Hospital Logo" 
+            className="w-full h-full object-contain p-1"
+          />
         </div>
-        <span className="font-semibold text-lg tracking-tight text-[#1d1d1f]">ACSP</span>
+        <span className="font-semibold text-lg tracking-tight text-[#1d1d1f]">CHEPA'S Hospital</span>
       </div>
-
       <nav className="flex-1 space-y-1">
         {elementosNavegacion.map((item) => {
           const Icono = item.Icono;

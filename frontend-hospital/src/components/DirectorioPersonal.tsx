@@ -584,11 +584,6 @@ export function DirectorioPersonal() {
                 </>
               )}
             </div>
-
-            <div className="flex flex-col gap-3 pt-4 border-t border-black/[0.05]">
-              <Boton onClick={() => setEmpleadoSeleccionado(null)}>Enviar Mensaje</Boton>
-              <Boton variante="secundario" onClick={() => setEmpleadoSeleccionado(null)}>Cerrar</Boton>
-            </div>
           </div>
         )}
       </Modal>

@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>ACSP | Directorio Médico</h1>
+  <h1>CHEPA'S HOSPITAL | Directorio Médico</h1>
   <p>Sistema de Gestión Hospitalaria Inteligente</p>
 </div>
 

@@ -27,6 +27,12 @@ export function ModuloPacientes() {
     nombre_paciente: "", curp: "", codigo_pais: "+52", numero_telefono: "", sexo: "", correo: "", edad: 0
   });
 
+  // 🛡️ FUNCIÓN DE SEGURIDAD (JWT)
+  const getHeaders = () => ({
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${localStorage.getItem('hospital_token') || ''}`
+  });
+
   const generarContrasena = () => {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let pass = "";
@@ -36,7 +42,15 @@ export function ModuloPacientes() {
 
   const fetchPacientes = async () => {
     try {
-      const res = await fetch("http://localhost:3333/api/pacientes/completo");
+      const res = await fetch("http://localhost:3333/api/pacientes/completo", {
+        headers: getHeaders()
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        window.location.reload(); // Si no hay token, lo manda al login
+        return;
+      }
+
       const data = await res.json();
       setPacientes(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -46,38 +60,26 @@ export function ModuloPacientes() {
   };
 
   useEffect(() => {
-    let montado = true;
-    const cargar = async () => {
-      try {
-        const res = await fetch("http://localhost:3333/api/pacientes/completo");
-        const data = await res.json();
-        if (montado) setPacientes(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error al cargar pacientes:", error);
-        if (montado) setPacientes([]);
-      }
-    };
-    cargar();
-    return () => { montado = false; };
+    fetchPacientes();
   }, []);
 
   const pacientesFiltrados = pacientes
     .filter(p => {
       const estado = (p.estado || "").toUpperCase();
       switch (filtroTab) {
-        case "activos":       return estado !== "BAJA";
-        case "bajas":         return estado === "BAJA";
-        case "en_espera":     return estado === "EN ESPERA";
+        case "activos": return estado !== "BAJA";
+        case "bajas": return estado === "BAJA";
+        case "en_espera": return estado === "EN ESPERA";
         case "hospitalizado": return estado === "HOSPITALIZADO";
-        case "alta":          return estado === "ALTA";
-        case "defuncion":      return estado === "DEFUNCION";
-        default:              return true;
+        case "alta": return estado === "ALTA";
+        case "defuncion": return estado === "DEFUNCION";
+        default: return true;
       }
     })
     .filter(p => {
       const term = busqueda.toLowerCase();
       return (p.nombre_paciente || "").toLowerCase().includes(term) ||
-             (p.curp || "").toLowerCase().includes(term);
+        (p.curp || "").toLowerCase().includes(term);
     });
 
   // --- 1. POST: Registrar Paciente ---
@@ -88,7 +90,7 @@ export function ModuloPacientes() {
     try {
       const respuesta = await fetch("http://localhost:3333/api/pacientes", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getHeaders(),
         body: JSON.stringify({
           nombre_paciente: nuevoPaciente.nombre_paciente,
           curp: nuevoPaciente.curp,
@@ -115,7 +117,7 @@ export function ModuloPacientes() {
         nombre: nuevoPaciente.nombre_paciente
       });
       setModalCredenciales(true);
-      setNuevoPaciente({ nombre_paciente: "", curp: "", codigo_pais: "+52", numero_telefono: "", sexo: "Masculino", correo: "", edad: 0 });
+      setNuevoPaciente({ nombre_paciente: "", curp: "", codigo_pais: "+52", numero_telefono: "", sexo: "", correo: "", edad: 0 });
     } catch (error) {
       console.error("Error al guardar en BD:", error);
     }
@@ -129,7 +131,7 @@ export function ModuloPacientes() {
     try {
       const res = await fetch(`http://localhost:3333/api/pacientes/${pacienteAEditar.id_paciente}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: getHeaders(),
         body: JSON.stringify({
           nombre_paciente: pacienteAEditar.nombre_paciente,
           curp: pacienteAEditar.curp,
@@ -158,7 +160,7 @@ export function ModuloPacientes() {
     try {
       const res = await fetch(`http://localhost:3333/api/pacientes/${pacienteId}/estado`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: getHeaders(),
         body: JSON.stringify({ id_status: nuevoIdStatus })
       });
       if (res.ok) fetchPacientes();
@@ -172,7 +174,7 @@ export function ModuloPacientes() {
     try {
       const res = await fetch(`http://localhost:3333/api/pacientes/${paciente.id_paciente}/baja`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" }
+        headers: getHeaders()
       });
 
       if (res.ok) {
@@ -193,7 +195,7 @@ export function ModuloPacientes() {
     try {
       const res = await fetch(`http://localhost:3333/api/pacientes/${paciente.id_paciente}/password`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: getHeaders(),
         body: JSON.stringify({ contrasena_plana: nuevaContrasena })
       });
 
@@ -213,19 +215,17 @@ export function ModuloPacientes() {
     }
   };
 
-  // Colores de estado — refleja los estados reales de estado_flujo_paciente
   const colorEstado = (estado: string): string => {
     switch (estado) {
-      case "EN ESPERA":      return "bg-yellow-100 text-yellow-700";
-      case "ALTA":           return "bg-blue-100 text-blue-700";    
-      case "DEFUNCION":       return "bg-gray-200 text-gray-600";
-      case "HOSPITALIZADO":  return "bg-red-hospital/20 text-dark-red-hospital"; //indigo-100 text-indigo-700 
-      case "BAJA":           return "bg-brand-green/20 text-brand-green-dark";
-      default:               return "bg-purple-100 text-purple-800";
+      case "EN ESPERA": return "bg-yellow-100 text-yellow-700";
+      case "ALTA": return "bg-blue-100 text-blue-700";
+      case "DEFUNCION": return "bg-gray-200 text-gray-600";
+      case "HOSPITALIZADO": return "bg-red-hospital/20 text-dark-red-hospital";
+      case "BAJA": return "bg-brand-green/20 text-brand-green-dark";
+      default: return "bg-purple-100 text-purple-800";
     }
   };
 
-  // Contadores por estado para los badges de cada tab
   const contarEstado = (estado: string) =>
     pacientes.filter(p => (p.estado || "").toUpperCase() === estado).length;
 
@@ -235,54 +235,18 @@ export function ModuloPacientes() {
     badge?: number;
     badgeColor?: string;
   }[] = [
-    {
-      key: "todos",
-      label: "Todos",
-      badge: pacientes.length,
-      badgeColor: "bg-gray-100 text-gray-600",
-    },
-    {
-      key: "activos",
-      label: "Activos",
-      badge: pacientes.filter(p => (p.estado || "").toUpperCase() !== "BAJA").length,
-      badgeColor: "bg-green-100 text-green-700",
-    },
-    {
-      key: "en_espera",
-      label: "En espera",
-      badge: contarEstado("EN ESPERA"),
-      badgeColor: "bg-yellow-100 text-yellow-700",
-    },
-    {
-      key: "hospitalizado",
-      label: "Hospitalizado",
-      badge: contarEstado("HOSPITALIZADO"),
-      badgeColor: "bg-red-hospital/20 text-dark-red-hospital",
-    },
-    {
-      key: "alta",
-      label: "Alta",
-      badge: contarEstado("ALTA"),
-      badgeColor: "bg-blue-100 text-blue-700",
-    },
-    {
-      key: "defuncion",
-      label: "Defunción",
-      badge: contarEstado("DEFUNCION"),
-      badgeColor: "bg-gray-200 text-gray-700",
-    },
-    {
-      key: "bajas",
-      label: "Bajas",
-      badge: contarEstado("BAJA"),
-      badgeColor: "bg-brand-green/20 text-brand-green-dark",
-    },
-  ];
+      { key: "todos", label: "Todos", badge: pacientes.length, badgeColor: "bg-gray-100 text-gray-600" },
+      { key: "activos", label: "Activos", badge: pacientes.filter(p => (p.estado || "").toUpperCase() !== "BAJA").length, badgeColor: "bg-green-100 text-green-700" },
+      { key: "en_espera", label: "En espera", badge: contarEstado("EN ESPERA"), badgeColor: "bg-yellow-100 text-yellow-700" },
+      { key: "hospitalizado", label: "Hospitalizado", badge: contarEstado("HOSPITALIZADO"), badgeColor: "bg-red-hospital/20 text-dark-red-hospital" },
+      { key: "alta", label: "Alta", badge: contarEstado("ALTA"), badgeColor: "bg-blue-100 text-blue-700" },
+      { key: "defuncion", label: "Defunción", badge: contarEstado("DEFUNCION"), badgeColor: "bg-gray-200 text-gray-700" },
+      { key: "bajas", label: "Bajas", badge: contarEstado("BAJA"), badgeColor: "bg-brand-green/20 text-brand-green-dark" },
+    ];
 
   return (
-
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
- 
+
       {/* HEADER */}
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
@@ -305,18 +269,17 @@ export function ModuloPacientes() {
           </Boton>
         </div>
       </header>
- 
+
       {/* TABS */}
       <div className="flex gap-0.5 border-b border-black/[0.06] overflow-x-auto">
         {tabs.map(tab => (
           <button
             key={tab.key}
             onClick={() => setFiltroTab(tab.key)}
-            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              filtroTab === tab.key
-                ? "border-blue-500 text-blue-600"
-                : "border-transparent text-[#86868b] hover:text-[#1d1d1f]"
-            }`}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${filtroTab === tab.key
+              ? "border-blue-500 text-blue-600"
+              : "border-transparent text-[#86868b] hover:text-[#1d1d1f]"
+              }`}
           >
             {tab.label}
             {tab.badge !== undefined && tab.badge > 0 && (
@@ -327,10 +290,10 @@ export function ModuloPacientes() {
           </button>
         ))}
       </div>
- 
+
       {/* TABLA */}
-      <div className="bg-white rounded-3xl shadow-[0_2px_20px_rgba(0,0,0,0.02)] border border-black/[0.02] overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="bg-white rounded-3xl shadow-[0_2px_20px_rgba(0,0,0,0.02)] border border-black/[0.02] overflow-visible">
+        <div className="overflow-x-auto overflow-visible">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-black/[0.05] bg-gray-50/50">
@@ -344,16 +307,17 @@ export function ModuloPacientes() {
             <tbody className="divide-y divide-black/[0.05]">
               {pacientesFiltrados.map((paciente) => {
                 const estadoVisual = (paciente.estado || "EN ESPERA").toUpperCase();
-                const esBaja = estadoVisual === "BAJA";
-                
+
                 return (
                   <tr
                     key={paciente.id_paciente}
-                    className="transition-colors group hover:bg-gray-50/50"
+                    // 🚨 1. HACEMOS LA FILA CLICKABLE 🚨
+                    onClick={() => setPacienteSeleccionado(paciente)}
+                    className="transition-colors group hover:bg-gray-50/50 cursor-pointer"
                   >
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className="font-semibold text-[#1d1d1f]">
+                        <span className="font-semibold text-[#1d1d1f] group-hover:text-blue-600 transition-colors">
                           {paciente.nombre_paciente}
                         </span>
                         <span className="text-xs text-[#86868b]">Folio: P-{paciente.id_paciente}</span>
@@ -369,40 +333,19 @@ export function ModuloPacientes() {
                       {paciente.codigo_pais || "+52"} {paciente.numero_telefono}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md ${colorEstado(estadoVisual)}`}>
+                      <span className={`text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full ${colorEstado(estadoVisual)}`}>
                         {estadoVisual}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <MenuDropdown
-                        opciones={[
-                          { etiqueta: "Ver Expediente", accion: () => setPacienteSeleccionado(paciente) },
-                          !esBaja ? { etiqueta: "Editar Datos", accion: () => setPacienteAEditar(paciente) } : null,
-                          !esBaja ? { etiqueta: "Generar Nueva Contraseña", accion: () => handleNuevaContrasena(paciente) } : null,
-                          (!esBaja && estadoVisual === "ALTA")
-                            ? { etiqueta: "Dar de Alta", accion: () => cambiarEstadoPaciente(paciente.id_paciente, 4) }
-                            : null,
-                          esBaja
-                            ? { etiqueta: "Reingresar (En Espera)", accion: () => cambiarEstadoPaciente(paciente.id_paciente, 1) }
-                            : { etiqueta: "Dar de Baja", accion: () => setConfirmandoBaja(paciente), peligro: true },
-                        ].filter((o): o is NonNullable<typeof o> => o !== null)}
-                      />
-                    </td>
+                    {/* 🚨 2. BORRAMOS LA CELDA DEL MENUDROPDOWN 🚨 */}
                   </tr>
                 );
               })}
-              {pacientesFiltrados.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-[#86868b]">
-                    No se encontraron pacientes con esa búsqueda.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
       </div>
- 
+
       {/* ── MODAL: Confirmar Baja ── */}
       <Modal isOpen={!!confirmandoBaja} onClose={() => setConfirmandoBaja(null)} titulo="Confirmar baja del paciente">
         {confirmandoBaja && (
@@ -432,7 +375,7 @@ export function ModuloPacientes() {
           </div>
         )}
       </Modal>
- 
+
       {/* ── MODAL: Registro ── */}
       <Modal isOpen={modalAbierto} onClose={() => setModalAbierto(false)} titulo="Registrar Nuevo Paciente">
         <form onSubmit={handleRegistrarPaciente} className="space-y-4">
@@ -444,6 +387,7 @@ export function ModuloPacientes() {
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-[#1d1d1f]">Teléfono de Contacto</label>
             <div className="flex gap-2">
+              {/* 👇 AQUI ESTA REPARADO EL BUG DEL CÓDIGO DE PAÍS 👇 */}
               <select className="px-3 py-2.5 bg-gray-50/50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 border border-black/[0.05] shadow-sm w-28"
                 value={nuevoPaciente.codigo_pais}
                 onChange={(e) => setNuevoPaciente({ ...nuevoPaciente, codigo_pais: e.target.value })}>
@@ -491,7 +435,7 @@ export function ModuloPacientes() {
           </div>
         </form>
       </Modal>
- 
+
       {/* ── MODAL: Credenciales ── */}
       <Modal isOpen={modalCredenciales} onClose={() => setModalCredenciales(false)} titulo="Acceso Generado Exitosamente">
         <div className="space-y-6 text-center">
@@ -532,28 +476,34 @@ export function ModuloPacientes() {
           </div>
         </div>
       </Modal>
- 
+
       {/* ── MODAL: Expediente ── */}
+      {/* ── MODAL: Expediente y Panel de Control ── */}
       <Modal isOpen={!!pacienteSeleccionado} onClose={() => setPacienteSeleccionado(null)} titulo="Expediente del Paciente">
         {pacienteSeleccionado && (
           <div className="space-y-6">
+
+            {/* Cabecera del Expediente */}
             <div>
               <h3 className="text-2xl font-semibold text-[#1d1d1f]">{pacienteSeleccionado.nombre_paciente}</h3>
               <p className="text-[#86868b] font-mono mt-1">{pacienteSeleccionado.curp}</p>
             </div>
-            <div className="bg-gray-50 p-4 rounded-2xl border border-black/[0.05] space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-[#86868b]">Estado</span>
-                <span className={`text-xs font-semibold uppercase tracking-wider px-2 py-1 rounded-md ${colorEstado((pacienteSeleccionado.estado || "").toUpperCase())}`}>
+
+            {/* Tarjeta de Información */}
+            <div className="bg-gray-50 p-5 rounded-2xl border border-black/[0.05] space-y-4">
+              <div className="flex justify-between items-center pb-3 border-b border-black/[0.05]">
+                <span className="text-sm font-medium text-[#86868b]">Estado Actual</span>
+                <span className={`text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full ${colorEstado((pacienteSeleccionado.estado || "").toUpperCase())}`}>
                   {pacienteSeleccionado.estado || "N/A"}
                 </span>
               </div>
+
               {([
-                ["Folio",            `P-${pacienteSeleccionado.id_paciente}`],
-                ["Teléfono",         `${pacienteSeleccionado.codigo_pais || "+52"} ${pacienteSeleccionado.numero_telefono}`],
-                ["Correo",           pacienteSeleccionado.correo || "N/A"],
-                ["Edad / Sexo",      `${pacienteSeleccionado.edad || "N/A"} años / ${pacienteSeleccionado.sexo || "N/A"}`],
-                ["Fecha de Registro", pacienteSeleccionado.fecha_registro || "N/A"],
+                ["Folio del Sistema", `P-${pacienteSeleccionado.id_paciente}`],
+                ["Contacto Principal", `${pacienteSeleccionado.codigo_pais || "+52"} ${pacienteSeleccionado.numero_telefono}`],
+                ["Correo Electrónico", pacienteSeleccionado.correo || "No registrado"],
+                ["Perfil Médico", `${pacienteSeleccionado.edad || "N/A"} años / ${pacienteSeleccionado.sexo || "N/A"}`],
+                ["Fecha de Ingreso", pacienteSeleccionado.fecha_registro || "N/A"],
               ] as [string, string][]).map(([label, value]) => (
                 <div key={label} className="flex justify-between items-center">
                   <span className="text-sm text-[#86868b]">{label}</span>
@@ -561,14 +511,70 @@ export function ModuloPacientes() {
                 </div>
               ))}
             </div>
-            <div className="flex flex-col gap-3 pt-4 border-t border-black/[0.05]">
-              <Boton onClick={() => setPacienteSeleccionado(null)}>Ver Historial Médico</Boton>
-              <Boton variante="secundario" onClick={() => setPacienteSeleccionado(null)}>Cerrar</Boton>
+
+            {/* 🚨 PANEL DE ACCIONES INTELIGENTE 🚨 */}
+            <div className="pt-4 space-y-3">
+              <h4 className="text-xs font-bold text-[#86868b] uppercase tracking-wider mb-2">Acciones Administrativas</h4>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* 1. Botón Editar (Solo si no es BAJA) */}
+                {(pacienteSeleccionado.estado || "").toUpperCase() !== "BAJA" && (
+                  <Boton
+                    onClick={() => {
+                      setPacienteSeleccionado(null); // Cerramos este modal
+                      setPacienteAEditar(pacienteSeleccionado); // Abrimos el modal de edición
+                    }}
+                    className="w-full bg-blue-600 text-white hover:bg-blue-800 border-none shadow-none"
+                  >
+                    Editar Datos
+                  </Boton>
+                )}
+
+                {/* 2. Botón Nueva Contraseña (Solo si no es BAJA) */}
+                {(pacienteSeleccionado.estado || "").toUpperCase() !== "BAJA" && (
+                  <Boton
+                    onClick={() => {
+                      setPacienteSeleccionado(null);
+                      handleNuevaContrasena(pacienteSeleccionado);
+                    }}
+                    className="w-full bg-gray-200 text-gray-700 hover:bg-yellow-200 border-none shadow-none"
+                  >
+                    Reset Password
+                  </Boton>
+                )}
+              </div>
+
+              {/* 3. Acciones de Flujo (Dar de Alta / Baja / Reingreso) */}
+              <div className="flex flex-col gap-2 pt-2 border-t border-black/[0.05]">
+
+                {(pacienteSeleccionado.estado || "").toUpperCase() === "ATENCIÓN MÉDICA" && (
+                  <Boton onClick={() => { cambiarEstadoPaciente(pacienteSeleccionado.id_paciente, 4); setPacienteSeleccionado(null); }} className="w-full bg-green-50 text-green-700 hover:bg-green-100 border-none shadow-none">
+                    Marcar como Alta Médica
+                  </Boton>
+                )}
+
+                {(pacienteSeleccionado.estado || "").toUpperCase() === "BAJA" ? (
+                  <Boton onClick={() => { cambiarEstadoPaciente(pacienteSeleccionado.id_paciente, 1); setPacienteSeleccionado(null); }} className="w-full">
+                    Reingresar Paciente
+                  </Boton>
+                ) : (
+                  <Boton
+                    onClick={() => {
+                      setConfirmandoBaja(pacienteSeleccionado);
+                      setPacienteSeleccionado(null);
+                    }}
+                    className="w-full bg-red-500 text-white hover:bg-red-700 border-none shadow-none"
+                  >
+                    Dar de Baja (Retirar del Sistema)
+                  </Boton>
+                )}
+              </div>
+
             </div>
           </div>
         )}
       </Modal>
- 
+
       {/* ── MODAL: Edición ── */}
       <Modal isOpen={!!pacienteAEditar} onClose={() => setPacienteAEditar(null)} titulo="Editar Datos del Paciente">
         {pacienteAEditar && (
@@ -603,9 +609,9 @@ export function ModuloPacientes() {
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium text-[#1d1d1f]">Sexo</label>
                 <select className="px-4 py-2.5 bg-gray-50/50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 border border-black/[0.05] shadow-sm w-full"
-                  value={pacienteAEditar.sexo || "Masculino"}
+                  value={pacienteAEditar?.sexo || ""}
                   onChange={(e) => setPacienteAEditar({ ...pacienteAEditar, sexo: e.target.value })}>
-                  <option value="" disabled>Elegir una opción</option>
+                  <option value="" disabled>Elegir una opcion</option>
                   <option value="Masculino">Masculino</option>
                   <option value="Femenino">Femenino</option>
                   <option value="Otro">Otro</option>
@@ -621,7 +627,7 @@ export function ModuloPacientes() {
           </form>
         )}
       </Modal>
- 
+
     </motion.div>
   );
 }

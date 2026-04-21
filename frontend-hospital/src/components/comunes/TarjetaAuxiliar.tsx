@@ -15,7 +15,7 @@ export function TarjetaAuxiliar({ auxiliar, onClick, opciones }: Props) {
   return (
     <div 
       onClick={onClick}
-      className="flex items-center justify-between p-4 rounded-2xl border border-black/[0.05] hover:shadow-md transition-all cursor-pointer group bg-white hover:scale-[1.01]"
+      className="flex items-center justify-between p-4 rounded-2xl border border-black/[0.05] hover:shadow-md transition-all cursor-pointer group bg-white hover:scale-[1.01] overflow-visible"
     >
       <div className="flex items-center gap-4">
         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-100 to-purple-50 flex items-center justify-center text-purple-600 font-semibold text-lg">
@@ -28,8 +28,10 @@ export function TarjetaAuxiliar({ auxiliar, onClick, opciones }: Props) {
           <p className="text-sm text-[#86868b] capitalize">{auxiliar.tipo_auxiliar}</p>
         </div>
       </div>
-      <div className="flex flex-col items-end gap-2">
+
+      <div className="flex flex-col items-end gap-2 relative z-20 overflow-visible">
         {opciones && <MenuDropdown opciones={opciones} />}
+        
         <span className={`text-[11px] font-semibold uppercase tracking-wider px-2 py-1 rounded-md ${
           auxiliar.turno === 'Día' ? 'bg-amber-100 text-amber-700' :
           auxiliar.turno === 'Tarde' ? 'bg-orange-100 text-orange-700' :
