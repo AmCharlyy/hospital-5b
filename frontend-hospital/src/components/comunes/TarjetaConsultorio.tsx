@@ -27,7 +27,7 @@ export function TarjetaConsultorio({ consultorio, onClick }: Props) {
         </span>
       </div>
       
-      <h3 className="text-lg font-bold text-[#1d1d1f] mb-1 truncate" title={consultorio.nombre_consultorio}>
+      <h3 className="text-lg font-bold text-[#1d1d1f] mb-1 truncate group-hover:text-light_aqua  transition-colors" title={consultorio.nombre_consultorio}>
         {consultorio.nombre_consultorio}
       </h3>
       

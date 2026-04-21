@@ -26,7 +26,7 @@ export function TarjetaEmpleado({ empleado, onClick, opciones }: Props) {
           {empleado.avatar}
         </div>
         <div>
-          <h3 className="text-[15px] font-semibold text-[#1d1d1f] group-hover:text-blue-600 transition-colors">{empleado.nombre}</h3>
+          <h3 className="text-[15px] font-semibold text-[#1d1d1f] group-hover:text-light_aqua transition-colors">{empleado.nombre}</h3>
           <p className="text-sm text-[#86868b]">{empleado.rol}</p>
         </div>
       </div>

@@ -22,7 +22,7 @@ export function TarjetaAuxiliar({ auxiliar, onClick, opciones }: Props) {
           {getAvatar()}
         </div>
         <div>
-          <h3 className="text-[15px] font-semibold text-[#1d1d1f] group-hover:text-purple-600 transition-colors">
+          <h3 className="text-[15px] font-semibold text-[#1d1d1f] group-hover:text-light_aqua transition-colors">
             {auxiliar.nombre} {auxiliar.apellido}
           </h3>
           <p className="text-sm text-[#86868b] capitalize">{auxiliar.tipo_auxiliar}</p>

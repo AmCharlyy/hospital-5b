@@ -44,20 +44,20 @@ export function DirectorioPersonal() {
           : (emp.nombre || "??").substring(0, 2).toUpperCase();
 
         return {
-          id:                 `${emp.tipo.substring(0, 3).toUpperCase()}-${emp.id_real}`,
-          id_real:            emp.id_real,
-          nombre:             emp.nombre || "Sin nombre",
-          rol:                emp.especialidad || "General",
+          id: `${emp.tipo.substring(0, 3).toUpperCase()}-${emp.id_real}`,
+          id_real: emp.id_real,
+          nombre: emp.nombre || "Sin nombre",
+          rol: emp.especialidad || "General",
           // Bug 1 — guardar id_especialidad separado del nombre para el PUT
-          id_especialidad:    emp.id_especialidad ?? null,
-          tipo:               emp.tipo,
-          estado:             emp.estado_actual || "Disponible",
-          avatar:             iniciales,
+          id_especialidad: emp.id_especialidad ?? null,
+          tipo: emp.tipo,
+          estado: emp.estado_actual || "Disponible",
+          avatar: iniciales,
           cedula_profesional: emp.cedula_profesional || "",
-          telefono:           emp.telefono || "",
-          correo:             emp.correo || "",
-          usuario:            emp.usuario || "",
-          consultorio:        emp.consultorio || ""
+          telefono: emp.telefono || "",
+          correo: emp.correo || "",
+          usuario: emp.usuario || "",
+          consultorio: emp.consultorio || ""
         };
       });
       setEmpleados(personalFormateado);
@@ -103,26 +103,25 @@ export function DirectorioPersonal() {
   const empleadosFiltrados = empleados.filter((emp) => {
     const coincideTab =
       filtroTab === "Todos" ||
-      (filtroTab === "Doctores"        && emp.tipo === "doctor") ||
-      (filtroTab === "Enfermería"      && emp.tipo === "enfermero") ||
+      (filtroTab === "Doctores" && emp.tipo === "doctor") ||
+      (filtroTab === "Enfermería" && emp.tipo === "enfermero") ||
       (filtroTab === "Administrativos" && emp.tipo === "administrativo");
 
     const term = busqueda.toLowerCase();
     // Bug 3 — .toLowerCase() sin guard crashea si nombre o rol son null
     const coincideBusqueda =
       (emp.nombre || "").toLowerCase().includes(term) ||
-      (emp.rol    || "").toLowerCase().includes(term);
+      (emp.rol || "").toLowerCase().includes(term);
 
     return coincideTab && coincideBusqueda;
   });
 
-  // --- POST: Crear nuevo personal ---
   const handleCrear = async (e: React.FormEvent) => {
     e.preventDefault();
     const endpoints: Record<string, string> = {
-      doctor:         "http://localhost:3333/api/doctores",
+      doctor: "http://localhost:3333/api/doctores",
       administrativo: "http://localhost:3333/api/administrativos",
-      enfermero:      "http://localhost:3333/api/enfermeros",
+      enfermero: "http://localhost:3333/api/enfermeros",
     };
     const endpoint = endpoints[nuevoEmpleado.tipo];
     if (!endpoint) return alert("Tipo de personal no configurado.");
@@ -131,19 +130,20 @@ export function DirectorioPersonal() {
     const body: Record<string, any> = { nombre: nuevoEmpleado.nombre };
     if (nuevoEmpleado.tipo === "doctor") {
       body.cedula_profesional = nuevoEmpleado.cedula_profesional;
-      body.telefono           = nuevoEmpleado.telefono;
-      body.correo             = nuevoEmpleado.correo;
-      body.usuario            = nuevoEmpleado.usuario;
-      body.contrasena         = nuevoEmpleado.contrasena;
-      body.consultorio        = nuevoEmpleado.consultorio || null;
-      body.id_especialidad    = nuevoEmpleado.id_especialidad
-                                  ? Number(nuevoEmpleado.id_especialidad)
-                                  : null;
-    } else if (nuevoEmpleado.tipo === "enfermero") {
-      body.telefono   = nuevoEmpleado.telefono;
-      body.correo     = nuevoEmpleado.correo;
-      body.usuario    = nuevoEmpleado.usuario;
+      body.telefono = nuevoEmpleado.telefono;
+      body.correo = nuevoEmpleado.correo;
+      body.usuario = nuevoEmpleado.usuario;
       body.contrasena = nuevoEmpleado.contrasena;
+      body.consultorio = nuevoEmpleado.consultorio || null;
+      body.id_especialidad = nuevoEmpleado.id_especialidad
+        ? Number(nuevoEmpleado.id_especialidad)
+        : null;
+    } else if (nuevoEmpleado.tipo === "enfermero") {
+      body.telefono = nuevoEmpleado.telefono;
+      body.correo = nuevoEmpleado.correo;
+      body.usuario = nuevoEmpleado.usuario;
+      body.contrasena = nuevoEmpleado.contrasena;
+      body.rol = nuevoEmpleado.rol;
     } else {
       // administrativo: el backend solo usa nombre y puesto
       body.puesto = nuevoEmpleado.rol || "Administrativo General";
@@ -178,11 +178,11 @@ export function DirectorioPersonal() {
   const handleGuardarEdicion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!empleadoAEditar) return;
-    
+
     let endpoint = "";
     let bodyData = {};
 
-     if (empleadoAEditar.tipo === 'doctor') {
+    if (empleadoAEditar.tipo === 'doctor') {
       endpoint = `http://localhost:3333/api/doctores/${empleadoAEditar.id_real}`;
       bodyData = {
         nombre_doctor: empleadoAEditar.nombre,
@@ -235,9 +235,9 @@ export function DirectorioPersonal() {
   // --- DELETE: Dar de baja ---
   const handleDarDeBaja = async (empleado: any) => {
     const endpoints: Record<string, string> = {
-      doctor:         `http://localhost:3333/api/doctores/${empleado.id_real}`,
+      doctor: `http://localhost:3333/api/doctores/${empleado.id_real}`,
       administrativo: `http://localhost:3333/api/administrativos/${empleado.id_real}`,
-      enfermero:      `http://localhost:3333/api/enfermeros/${empleado.id_real}`,
+      enfermero: `http://localhost:3333/api/enfermeros/${empleado.id_real}`,
     };
     const endpoint = endpoints[empleado.tipo];
     if (!endpoint) return;
@@ -257,13 +257,13 @@ export function DirectorioPersonal() {
 
   const colorEstado = (estado: string) => {
     switch (estado) {
-      case "En Turno":    return "bg-green-100 text-green-700";
+      case "En Turno": return "bg-green-100 text-green-700";
       case "En Consulta": return "bg-blue-100 text-blue-700";
-      case "Disponible":  return "bg-green-100 text-green-700";
-      case "Descanso":    return "bg-yellow-100 text-yellow-700";
-      case "Ausente":     return "bg-orange-100 text-orange-700";
-      case "Inactivo":    return "bg-red-100 text-red-600";
-      default:            return "bg-gray-100 text-gray-600";
+      case "Disponible": return "bg-green-100 text-green-700";
+      case "Descanso": return "bg-yellow-100 text-yellow-700";
+      case "Ausente": return "bg-orange-100 text-orange-700";
+      case "Inactivo": return "bg-red-100 text-red-600";
+      default: return "bg-gray-100 text-gray-600";
     }
   };
 
@@ -319,11 +319,11 @@ export function DirectorioPersonal() {
                   empleado={empleado}
                   onClick={() => setEmpleadoSeleccionado(empleado)}
                   opciones={[
-                    { etiqueta: "Ver Perfil",   accion: () => setEmpleadoSeleccionado(empleado) },
+                    { etiqueta: "Ver Perfil", accion: () => setEmpleadoSeleccionado(empleado) },
                     { etiqueta: "Editar Datos", accion: () => setEmpleadoAEditar(empleado) },
                     // Bug 7 — "Dar de Baja" abría window.confirm inline bloqueando el hilo
                     // Reemplazado por modal de confirmación
-                    { etiqueta: "Dar de Baja",  accion: () => setConfirmandoBaja(empleado), peligro: true },
+                    { etiqueta: "Dar de Baja", accion: () => setConfirmandoBaja(empleado), peligro: true },
                   ]}
                 />
               ))
@@ -375,7 +375,7 @@ export function DirectorioPersonal() {
           <Select
             label="Tipo de Personal"
             value={nuevoEmpleado.tipo}
-            onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, tipo: e.target.value, rol: "", id_especialidad: "" })}
+            onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, tipo: e.target.value, rol: "" })}
           >
             <option value="doctor">Doctor(a)</option>
             <option value="enfermero">Enfermero(a)</option>
@@ -385,30 +385,25 @@ export function DirectorioPersonal() {
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-[#1d1d1f]">
               {nuevoEmpleado.tipo === "doctor" ? "Especialidad Médica" :
-               nuevoEmpleado.tipo === "enfermero" ? "Área de Enfermería" : "Puesto Administrativo"}
+                nuevoEmpleado.tipo === "enfermero" ? "Área de Enfermería" : "Puesto Administrativo"}
             </label>
+
             <select
               required
               className="px-4 py-2.5 bg-gray-50/50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 border border-black/[0.05] shadow-sm w-full"
-              value={nuevoEmpleado.tipo === "doctor" ? nuevoEmpleado.id_especialidad : nuevoEmpleado.rol}
-              onChange={(e) => {
-
-                if (nuevoEmpleado.tipo === "doctor") {
-                  setNuevoEmpleado({ ...nuevoEmpleado, id_especialidad: e.target.value, rol: e.target.options[e.target.selectedIndex].text });
-                } else {
-                  setNuevoEmpleado({ ...nuevoEmpleado, rol: e.target.value });
-                }
-              }}
+              value={nuevoEmpleado.rol} // Este es el valor que se guarda en tu estado
+              onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, rol: e.target.value })} // 👈 Esto debe actualizar nuevoEmpleado.rol
             >
               <option value="">Seleccionar opción...</option>
-              {nuevoEmpleado.tipo === "doctor" && (
+              {nuevoEmpleado.tipo === 'doctor' && (
                 <>
                   {especialidades.map((esp) => (
                     <option key={esp.id_especialidad} value={esp.id_especialidad}>{esp.nombre}</option>
                   ))}
+                  <option value="General">Médico General</option>
                 </>
               )}
-              {nuevoEmpleado.tipo === "enfermero" && (
+              {nuevoEmpleado.tipo === 'enfermero' && (
                 <>
                   <option value="Enfermería General">Enfermería General</option>
                   <option value="UCI">UCI (Cuidados Intensivos)</option>
@@ -416,6 +411,8 @@ export function DirectorioPersonal() {
                   <option value="Pediatría">Enfermería Pediátrica</option>
                 </>
               )}
+
+
               {nuevoEmpleado.tipo === "administrativo" && (
                 <>
                   <option value="Recepción">Recepción</option>
@@ -491,7 +488,7 @@ export function DirectorioPersonal() {
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-[#1d1d1f]">
                 {empleadoAEditar.tipo === "doctor" ? "Especialidad Médica" :
-                 empleadoAEditar.tipo === "enfermero" ? "Área de Enfermería" : "Puesto Administrativo"}
+                  empleadoAEditar.tipo === "enfermero" ? "Área de Enfermería" : "Puesto Administrativo"}
               </label>
               <select
                 className="px-4 py-2.5 bg-gray-50/50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 border border-black/[0.05] shadow-sm w-full"
@@ -593,14 +590,14 @@ export function DirectorioPersonal() {
 
             <div className="bg-gray-50 p-4 rounded-2xl border border-black/[0.05] text-left space-y-3">
               {([
-                ["Estado",         <span className={`text-xs font-semibold uppercase tracking-wider px-2 py-1 rounded-md ${colorEstado(empleadoSeleccionado.estado)}`}>{empleadoSeleccionado.estado}</span>],
-                ["Tipo",           <span className="capitalize">{empleadoSeleccionado.tipo}</span>],
-                ["ID Empleado",    empleadoSeleccionado.id],
+                ["Estado", <span className={`text-xs font-semibold uppercase tracking-wider px-2 py-1 rounded-md ${colorEstado(empleadoSeleccionado.estado)}`}>{empleadoSeleccionado.estado}</span>],
+                ["Tipo", <span className="capitalize">{empleadoSeleccionado.tipo}</span>],
+                ["ID Empleado", empleadoSeleccionado.id],
                 ...(empleadoSeleccionado.cedula_profesional ? [["Cédula", empleadoSeleccionado.cedula_profesional]] : []),
-                ...(empleadoSeleccionado.telefono           ? [["Teléfono", empleadoSeleccionado.telefono]] : []),
-                ...(empleadoSeleccionado.correo             ? [["Correo", empleadoSeleccionado.correo]] : []),
-                ...(empleadoSeleccionado.consultorio        ? [["Consultorio", empleadoSeleccionado.consultorio]] : []),
-                ...(empleadoSeleccionado.usuario            ? [["Usuario", empleadoSeleccionado.usuario]] : []),
+                ...(empleadoSeleccionado.telefono ? [["Teléfono", empleadoSeleccionado.telefono]] : []),
+                ...(empleadoSeleccionado.correo ? [["Correo", empleadoSeleccionado.correo]] : []),
+                ...(empleadoSeleccionado.consultorio ? [["Consultorio", empleadoSeleccionado.consultorio]] : []),
+                ...(empleadoSeleccionado.usuario ? [["Usuario", empleadoSeleccionado.usuario]] : []),
               ] as [string, React.ReactNode][]).map(([label, value]) => (
                 <div key={label} className="flex justify-between items-center">
                   <span className="text-sm text-[#86868b]">{label}</span>

@@ -277,7 +277,7 @@ export function ModuloPacientes() {
             key={tab.key}
             onClick={() => setFiltroTab(tab.key)}
             className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${filtroTab === tab.key
-              ? "border-blue-500 text-blue-600"
+              ? "border-aqua-hospital text-indigo-hospital"
               : "border-transparent text-[#86868b] hover:text-[#1d1d1f]"
               }`}
           >
@@ -317,7 +317,7 @@ export function ModuloPacientes() {
                   >
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className="font-semibold text-[#1d1d1f] group-hover:text-blue-600 transition-colors">
+                        <span className="font-semibold text-[#1d1d1f] group-hover:text-light_aqua transition-colors">
                           {paciente.nombre_paciente}
                         </span>
                         <span className="text-xs text-[#86868b]">Folio: P-{paciente.id_paciente}</span>

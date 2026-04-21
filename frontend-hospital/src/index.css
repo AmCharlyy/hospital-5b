@@ -1,10 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
- 
+
 @theme {
   /*Paleta de alertas*/
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --color-brand-green: #33CB42;        
+  --color-brand-green: #33CB42;
   --color-brand-green-hover: #28b836;
   --color-brand-green-dark: #1a7a25;
   --color-red-hospital: #AC211F;
