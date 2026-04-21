@@ -19,7 +19,7 @@ export function BarraLateral({ pestanaActiva, setPestanaActiva }: Props) {
   return (
     <aside className="w-64 h-screen fixed left-0 top-0 p-6 flex flex-col bg-[#f5f5f7]">
       <div className="flex items-center gap-3 px-2 mb-10">
-        <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm border border-black/[0.05] overflow-hidden">
+        <div className="w-20 h-20 rounded-xl bg-white flex items-center justify-center overflow-hidden">
           <img 
             src="https://i.postimg.cc/13NcVHWy/LOGO.png" 
             alt="CHEPA'S Hospital Logo" 

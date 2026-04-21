@@ -345,7 +345,7 @@ app.get('/api/personal/completo', async (req, res) => {
 
 
 // --- ADMINISTRATIVOS ---
-app.post('/api/administrativos', async (req, res) => {
+app.post('/api/administrativos', async (req, res) => {    //Crear administrativo
   const { nombre } = req.body;
   if (!nombre) return res.status(400).json({ error: "El nombre es obligatorio." });
 
@@ -362,17 +362,49 @@ app.post('/api/administrativos', async (req, res) => {
   }
 });
 
+app.route('/api/administrativos/:id')
+  .put(async (req, res) => {    //Editar administrativo
+    const { id } = req.params;
+    const { nombre, puesto } = req.body;
+
+    try {
+      const result = await pool.query(
+        `UPDATE administrativos SET nombre = $1, puesto = $2 WHERE id = $3 RETURNING *`,
+        [nombre, puesto || 'Administrativo General', id]
+      );
+      if (result.rowCount === 0) return res.status(404).json({ error: 'Administrativo no encontrado' });
+      res.json({ message: "Administrativo actualizado correctamente" });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: error.message });
+    }
+  })
+  .delete(async (req, res) => {   //Eliminar administrativo
+    const { id } = req.params;
+    try {
+      const result = await pool.query(
+        `DELETE FROM administrativos WHERE id = $1 RETURNING *`,
+        [id]
+      );
+      if (result.rowCount === 0) return res.status(404).json({ error: 'Administrativo no encontrado' });
+      res.json({ message: "Administrativo eliminado correctamente" });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
 // --- ENFERMEROS ---
 app.post('/api/enfermeros', async (req, res) => {
-  const { nombre, telefono, correo, usuario, contrasena } = req.body;
+  const { nombre, telefono, correo, usuario, contrasena, rol } = req.body; 
   if (!nombre || !contrasena) return res.status(400).json({ error: "Faltan datos obligatorios." });
 
   try {
     const contrasenaHasheada = await bcrypt.hash(contrasena, 10);
     const nuevoEnf = await pool.query(
-      `INSERT INTO enfermeros (nombre_enfermero, telefono, correo, usuario, contrasena, estado) 
-       VALUES ($1, $2, $3, $4, $5, 'Activo') RETURNING *`,
-      [nombre, telefono, correo, usuario, contrasenaHasheada]
+      `INSERT INTO enfermeros (nombre_enfermero, telefono, correo, usuario, contrasena, estado, area) 
+       VALUES ($1, $2, $3, $4, $5, 'Activo', $6) RETURNING *`,
+      [nombre, telefono, correo, usuario, contrasenaHasheada, rol || 'Enfermería General']
     );
     res.status(201).json(nuevoEnf.rows[0]);
   } catch (error) {
@@ -380,14 +412,35 @@ app.post('/api/enfermeros', async (req, res) => {
   }
 });
 
-app.delete('/api/enfermeros/:id', async (req, res) => {
-  try {
-    await pool.query("UPDATE enfermeros SET estado = 'Inactivo' WHERE id_enfermero = $1", [req.params.id]);
-    res.json({ message: "Enfermero dado de baja exitosamente" });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+app.route('/api/enfermeros/:id')
+  .put(async (req, res) => {
+    const { id } = req.params;
+    const { nombre, telefono, correo, estado, area } = req.body;
+
+    try {
+      const result = await pool.query(
+        `UPDATE enfermeros 
+         SET nombre_enfermero = $1, telefono = $2, correo = $3, estado = $4, area = $5
+         WHERE id_enfermero = $6 RETURNING *`,
+        [nombre, telefono || null, correo || null, estado || 'Activo', area || 'Enfermería General', id]
+      );
+      if (result.rowCount === 0) return res.status(404).json({ error: 'Enfermero no encontrado' });
+      res.json({ message: "Enfermero actualizado correctamente" });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: error.message });
+    }
+  })
+  .delete(async (req, res) => {
+    const { id } = req.params;
+    try {
+      await pool.query("UPDATE enfermeros SET estado = 'Inactivo' WHERE id_enfermero = $1", [id]);
+      res.json({ message: "Enfermero dado de baja exitosamente" });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
 app.get('/api/doctores/estado', async (req, res) => {
   try {

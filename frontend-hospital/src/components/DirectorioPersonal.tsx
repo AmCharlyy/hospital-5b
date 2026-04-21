@@ -8,10 +8,7 @@ import { Input } from "./comunes/Input";
 import { Select } from "./comunes/Select";
 
 export function DirectorioPersonal() {
-  // Estado para los empleados que vienen de la base de datos
   const [empleados, setEmpleados] = useState<any[]>([]);
-
-  // Estados de Interfaz
   const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<any | null>(null);
   const [empleadoAEditar, setEmpleadoAEditar] = useState<any | null>(null);
   const [modalNuevo, setModalNuevo] = useState(false);
@@ -19,160 +16,205 @@ export function DirectorioPersonal() {
   const [filtroTab, setFiltroTab] = useState("Todos");
   const [consultorios, setConsultorios] = useState<any[]>([]);
   const [especialidades, setEspecialidades] = useState<any[]>([]);
+  const [confirmandoBaja, setConfirmandoBaja] = useState<any | null>(null);
 
-  // Estado para el formulario de nuevo empleado
   const [nuevoEmpleado, setNuevoEmpleado] = useState({
-    nombre: "",
-    rol: "",
-    tipo: "doctor",
-    cedula_profesional: "",
-    telefono: "",
-    correo: "",
-    usuario: "",
-    contrasena: "",
-    consultorio: ""
+    nombre: "", rol: "", id_especialidad: "",
+    tipo: "doctor", cedula_profesional: "",
+    telefono: "", correo: "", usuario: "",
+    contrasena: "", consultorio: ""
   });
 
-  // 1. Conexión al Backend (GET) - Empleados
+  const getHeaders = () => ({
+    'Content-Type': 'application/json', // 🚨 ESTO ES VITAL: Le dice al backend "Oye, léeme como JSON"
+    'Authorization': `Bearer ${localStorage.getItem('hospital_token') || ''}`
+  });
+
+  // --- GET: Personal ---
   const fetchEmpleados = async () => {
     try {
       const res = await fetch("http://localhost:3333/api/personal/completo");
       const data = await res.json();
-      
+      if (!Array.isArray(data)) { setEmpleados([]); return; }
+
       const personalFormateado = data.map((emp: any) => {
-        const partes = emp.nombre.split(' ');
-        const iniciales = partes.length > 1 ? partes[0][0] + partes[1][0] : emp.nombre.substring(0, 2);
+        const partes = (emp.nombre || "").trim().split(" ");
+        const iniciales = partes.length > 1
+          ? (partes[0][0] + partes[1][0]).toUpperCase()
+          : (emp.nombre || "??").substring(0, 2).toUpperCase();
 
         return {
-          id: `${emp.tipo.substring(0,3).toUpperCase()}-${emp.id_real}`,
-          id_real: emp.id_real,
-          nombre: emp.nombre,
-          rol: emp.especialidad || 'General',
-          tipo: emp.tipo,
-          estado: emp.estado_actual || 'Disponible',
-          avatar: iniciales.toUpperCase(),
+          id:                 `${emp.tipo.substring(0, 3).toUpperCase()}-${emp.id_real}`,
+          id_real:            emp.id_real,
+          nombre:             emp.nombre || "Sin nombre",
+          rol:                emp.especialidad || "General",
+          // Bug 1 — guardar id_especialidad separado del nombre para el PUT
+          id_especialidad:    emp.id_especialidad ?? null,
+          tipo:               emp.tipo,
+          estado:             emp.estado_actual || "Disponible",
+          avatar:             iniciales,
           cedula_profesional: emp.cedula_profesional || "",
-          telefono: emp.telefono || "Sin teléfono",
-          correo: emp.correo || "Sin correo",
-          usuario: emp.usuario || "",
-          consultorio: emp.consultorio || ""
+          telefono:           emp.telefono || "",
+          correo:             emp.correo || "",
+          usuario:            emp.usuario || "",
+          consultorio:        emp.consultorio || ""
         };
       });
       setEmpleados(personalFormateado);
     } catch (error) {
       console.error("Error al cargar personal:", error);
+      setEmpleados([]);
     }
   };
 
-  // 2. Conexión al Backend (GET) - Consultorios Disponibles
+  // --- GET: Consultorios disponibles ---
   const fetchConsultorios = async () => {
     try {
       const res = await fetch("http://localhost:3333/api/consultorios-disponibles");
       const data = await res.json();
-      if (Array.isArray(data)) {
-        setConsultorios(data);
-      } else {
-        setConsultorios([]);
-      }
+      setConsultorios(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error al cargar consultorios:", error);
     }
   };
 
-  // 3. Conexion Especialidades
+  // --- GET: Especialidades ---
   const fetchEspecialidades = async () => {
     try {
       const res = await fetch("http://localhost:3333/api/especialidades");
       const data = await res.json();
       setEspecialidades(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error("Error al cargar especialidades");
+      console.error("Error al cargar especialidades:", error);
     }
   };
 
+  // Bug 2 — useEffect sin cleanup: setState sobre componente desmontado
   useEffect(() => {
-    fetchEmpleados();
-    fetchConsultorios();
-    fetchEspecialidades();
+    let montado = true;
+    const cargar = async () => {
+      await Promise.all([fetchEmpleados(), fetchConsultorios(), fetchEspecialidades()]);
+    };
+    if (montado) cargar();
+    return () => { montado = false; };
   }, []);
 
-  // Lógica de Filtrado (Pestañas + Buscador)
+  // Filtrado
   const empleadosFiltrados = empleados.filter((emp) => {
     const coincideTab =
       filtroTab === "Todos" ||
-      (filtroTab === "Doctores" && emp.tipo === "doctor") ||
-      (filtroTab === "Enfermería" && emp.tipo === "enfermero") ||
+      (filtroTab === "Doctores"        && emp.tipo === "doctor") ||
+      (filtroTab === "Enfermería"      && emp.tipo === "enfermero") ||
       (filtroTab === "Administrativos" && emp.tipo === "administrativo");
 
+    const term = busqueda.toLowerCase();
+    // Bug 3 — .toLowerCase() sin guard crashea si nombre o rol son null
     const coincideBusqueda =
-      emp.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      emp.rol.toLowerCase().includes(busqueda.toLowerCase());
+      (emp.nombre || "").toLowerCase().includes(term) ||
+      (emp.rol    || "").toLowerCase().includes(term);
 
     return coincideTab && coincideBusqueda;
   });
 
-  // POST: Crear Nuevo Personal Dinámico 
+  // --- POST: Crear nuevo personal ---
   const handleCrear = async (e: React.FormEvent) => {
     e.preventDefault();
-    let endpoint = "";
-    if (nuevoEmpleado.tipo === 'doctor') endpoint = "http://localhost:3333/api/doctores";
-    else if (nuevoEmpleado.tipo === 'administrativo') endpoint = "http://localhost:3333/api/administrativos";
-    else if (nuevoEmpleado.tipo === 'enfermero') endpoint = "http://localhost:3333/api/enfermeros";
+    const endpoints: Record<string, string> = {
+      doctor:         "http://localhost:3333/api/doctores",
+      administrativo: "http://localhost:3333/api/administrativos",
+      enfermero:      "http://localhost:3333/api/enfermeros",
+    };
+    const endpoint = endpoints[nuevoEmpleado.tipo];
+    if (!endpoint) return alert("Tipo de personal no configurado.");
 
-    if (!endpoint) return alert("Ruta no configurada para este rol.");
-    
+    // Bug 4 — el POST de doctor espera id_especialidad (int), no rol (string)
+    const body: Record<string, any> = { nombre: nuevoEmpleado.nombre };
+    if (nuevoEmpleado.tipo === "doctor") {
+      body.cedula_profesional = nuevoEmpleado.cedula_profesional;
+      body.telefono           = nuevoEmpleado.telefono;
+      body.correo             = nuevoEmpleado.correo;
+      body.usuario            = nuevoEmpleado.usuario;
+      body.contrasena         = nuevoEmpleado.contrasena;
+      body.consultorio        = nuevoEmpleado.consultorio || null;
+      body.id_especialidad    = nuevoEmpleado.id_especialidad
+                                  ? Number(nuevoEmpleado.id_especialidad)
+                                  : null;
+    } else if (nuevoEmpleado.tipo === "enfermero") {
+      body.telefono   = nuevoEmpleado.telefono;
+      body.correo     = nuevoEmpleado.correo;
+      body.usuario    = nuevoEmpleado.usuario;
+      body.contrasena = nuevoEmpleado.contrasena;
+    } else {
+      // administrativo: el backend solo usa nombre y puesto
+      body.puesto = nuevoEmpleado.rol || "Administrativo General";
+    }
+
     try {
       const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nombre: nuevoEmpleado.nombre,
-          cedula_profesional: nuevoEmpleado.cedula_profesional,
-          telefono: nuevoEmpleado.telefono, 
-          correo: nuevoEmpleado.correo,
-          usuario: nuevoEmpleado.usuario,
-          contrasena: nuevoEmpleado.contrasena,
-          rol: nuevoEmpleado.rol // Lo enviamos para los administrativos y doctores
-        })
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
       });
 
       if (res.ok) {
-        alert("¡Personal registrado con éxito!");
         setModalNuevo(false);
-        setNuevoEmpleado({ 
-          nombre: "", rol: "", tipo: "doctor", cedula_profesional: "",
-          telefono: "", correo: "", usuario: "", contrasena: "", consultorio: ""
+        setNuevoEmpleado({
+          nombre: "", rol: "", id_especialidad: "", tipo: "doctor",
+          cedula_profesional: "", telefono: "", correo: "",
+          usuario: "", contrasena: "", consultorio: ""
         });
-        fetchEmpleados(); 
+        fetchEmpleados();
       } else {
         const errorData = await res.json();
         alert("Error al registrar: " + errorData.error);
       }
     } catch (error) {
       console.error("Error de conexión:", error);
-      alert("Hubo un error al conectar con el servidor.");
+      alert("Error al conectar con el servidor.");
     }
   };
 
-  // PUT: Editar Datos del Personal
+  // --- PUT: Editar personal ---
   const handleGuardarEdicion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!empleadoAEditar) return;
+    
+    let endpoint = "";
+    let bodyData = {};
+
+     if (empleadoAEditar.tipo === 'doctor') {
+      endpoint = `http://localhost:3333/api/doctores/${empleadoAEditar.id_real}`;
+      bodyData = {
+        nombre_doctor: empleadoAEditar.nombre,
+        id_especialidad: empleadoAEditar.id_especialidad,
+        cedula_profesional: empleadoAEditar.cedula_profesional,
+        telefono: empleadoAEditar.telefono,
+        correo: empleadoAEditar.correo,
+        consultorio: empleadoAEditar.consultorio,
+        estado: empleadoAEditar.estado // El backend espera 'estado'
+      };
+    } else if (empleadoAEditar.tipo === 'enfermero') {
+      endpoint = `http://localhost:3333/api/enfermeros/${empleadoAEditar.id_real}`;
+      bodyData = {
+        nombre: empleadoAEditar.nombre,
+        telefono: empleadoAEditar.telefono,
+        correo: empleadoAEditar.correo,
+        estado: empleadoAEditar.estado,
+        area: empleadoAEditar.rol // 👈 TRADUCCIÓN: El 'rol' del front es el 'area' de la BD
+      };
+    } else if (empleadoAEditar.tipo === 'administrativo') {
+      endpoint = `http://localhost:3333/api/administrativos/${empleadoAEditar.id_real}`;
+      bodyData = {
+        nombre: empleadoAEditar.nombre,
+        puesto: empleadoAEditar.rol // 👈 TRADUCCIÓN: El 'rol' del front es el 'puesto' de la BD
+      };
+    }
 
     try {
-      const res = await fetch(`http://localhost:3333/api/doctores/${empleadoAEditar.id_real}`, {
+      const res = await fetch(endpoint, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nombre_doctor: empleadoAEditar.nombre,
-          id_especialidad: empleadoAEditar.rol,
-          especialidad: empleadoAEditar.rol,
-          cedula_profesional: empleadoAEditar.cedula_profesional,
-          telefono: empleadoAEditar.telefono,
-          correo: empleadoAEditar.correo,
-          consultorio: empleadoAEditar.consultorio,
-          estado_actual: empleadoAEditar.estado
-        })
+        headers: getHeaders(),
+        body: JSON.stringify(bodyData)
       });
 
       if (res.ok) {
@@ -190,34 +232,45 @@ export function DirectorioPersonal() {
     }
   };
 
-  const getTabClass = (tabName: string) => {
-    return filtroTab === tabName
-      ? "text-sm font-semibold text-[#1d1d1f] border-b-2 border-[#1d1d1f] pb-4 -mb-4 transition-colors"
-      : "text-sm font-medium text-[#86868b] hover:text-[#1d1d1f] pb-4 -mb-4 transition-colors";
-  };
+  // --- DELETE: Dar de baja ---
+  const handleDarDeBaja = async (empleado: any) => {
+    const endpoints: Record<string, string> = {
+      doctor:         `http://localhost:3333/api/doctores/${empleado.id_real}`,
+      administrativo: `http://localhost:3333/api/administrativos/${empleado.id_real}`,
+      enfermero:      `http://localhost:3333/api/enfermeros/${empleado.id_real}`,
+    };
+    const endpoint = endpoints[empleado.tipo];
+    if (!endpoint) return;
 
-  // DELETE: Dar de baja al personal
-  const handleEliminarPersonal = async (empleado: any) => {
-    const confirmar = window.confirm(`¿Estás seguro de dar de baja a ${empleado.nombre}? Ya no aparecerá en el sistema activo.`);
-    if (!confirmar) return;
-
-    let endpoint = "";
-    if (empleado.tipo === 'doctor') endpoint = `http://localhost:3333/api/doctores/${empleado.id_real}`;
-    else if (empleado.tipo === 'administrativo') endpoint = `http://localhost:3333/api/administrativos/${empleado.id_real}`;
-    else if (empleado.tipo === 'enfermero') endpoint = `http://localhost:3333/api/enfermeros/${empleado.id_real}`;
-    
     try {
-      const res = await fetch(endpoint, { method: 'DELETE' });
+      const res = await fetch(endpoint, { method: "DELETE" });
       if (res.ok) {
-        alert("Personal dado de baja correctamente");
+        setConfirmandoBaja(null);
         fetchEmpleados();
       } else {
-        alert("Error al dar de baja");
+        alert("Error al dar de baja.");
       }
     } catch (error) {
       console.error("Error al eliminar:", error);
     }
   };
+
+  const colorEstado = (estado: string) => {
+    switch (estado) {
+      case "En Turno":    return "bg-green-100 text-green-700";
+      case "En Consulta": return "bg-blue-100 text-blue-700";
+      case "Disponible":  return "bg-green-100 text-green-700";
+      case "Descanso":    return "bg-yellow-100 text-yellow-700";
+      case "Ausente":     return "bg-orange-100 text-orange-700";
+      case "Inactivo":    return "bg-red-100 text-red-600";
+      default:            return "bg-gray-100 text-gray-600";
+    }
+  };
+
+  const getTabClass = (tabName: string) =>
+    filtroTab === tabName
+      ? "text-sm font-semibold text-[#1d1d1f] border-b-2 border-[#1d1d1f] pb-4 -mb-4 transition-colors"
+      : "text-sm font-medium text-[#86868b] hover:text-[#1d1d1f] pb-4 -mb-4 transition-colors";
 
   return (
     <motion.div
@@ -243,20 +296,18 @@ export function DirectorioPersonal() {
             />
           </div>
           <Boton onClick={() => setModalNuevo(true)}>
-            <Plus className="w-5 h-5" />
-            Añadir Personal
+            <Plus className="w-5 h-5" /> Añadir Personal
           </Boton>
         </div>
       </header>
 
       <div className="bg-white rounded-3xl shadow-[0_2px_20px_rgba(0,0,0,0.02)] border border-black/[0.02] overflow-visible">
-
-        {/* Pestañas (Tabs) */}
         <div className="flex items-center gap-6 px-6 py-4 border-b border-black/[0.05]">
-          <button onClick={() => setFiltroTab("Todos")} className={getTabClass("Todos")}>Todos</button>
-          <button onClick={() => setFiltroTab("Doctores")} className={getTabClass("Doctores")}>Doctores</button>
-          <button onClick={() => setFiltroTab("Enfermería")} className={getTabClass("Enfermería")}>Enfermería</button>
-          <button onClick={() => setFiltroTab("Administrativos")} className={getTabClass("Administrativos")}>Administrativos</button>
+          {["Todos", "Doctores", "Enfermería", "Administrativos"].map(tab => (
+            <button key={tab} onClick={() => setFiltroTab(tab)} className={getTabClass(tab)}>
+              {tab}
+            </button>
+          ))}
         </div>
 
         <div className="p-6">
@@ -268,10 +319,11 @@ export function DirectorioPersonal() {
                   empleado={empleado}
                   onClick={() => setEmpleadoSeleccionado(empleado)}
                   opciones={[
-                    { etiqueta: "Ver Perfil", accion: () => setEmpleadoSeleccionado(empleado) },
+                    { etiqueta: "Ver Perfil",   accion: () => setEmpleadoSeleccionado(empleado) },
                     { etiqueta: "Editar Datos", accion: () => setEmpleadoAEditar(empleado) },
-                    { etiqueta: "Asignar Turno", accion: () => alert(`Asignando turno a ${empleado.nombre}`) },
-                    { etiqueta: "Dar de Baja", accion: () => handleEliminarPersonal(empleado), peligro: true }
+                    // Bug 7 — "Dar de Baja" abría window.confirm inline bloqueando el hilo
+                    // Reemplazado por modal de confirmación
+                    { etiqueta: "Dar de Baja",  accion: () => setConfirmandoBaja(empleado), peligro: true },
                   ]}
                 />
               ))
@@ -284,13 +336,38 @@ export function DirectorioPersonal() {
         </div>
       </div>
 
-      {/* Modal Añadir Nuevo Personal */}
+      {/* ── MODAL: Confirmar Baja ── */}
+      <Modal isOpen={!!confirmandoBaja} onClose={() => setConfirmandoBaja(null)} titulo="Confirmar baja">
+        {confirmandoBaja && (
+          <div className="space-y-6">
+            <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex gap-3 items-start">
+              <span className="text-red-500 text-xl mt-0.5">⚠️</span>
+              <div>
+                <p className="text-sm font-semibold text-red-800">¿Dar de baja a este empleado?</p>
+                <p className="text-sm text-red-700 mt-1">
+                  <span className="font-semibold">{confirmandoBaja.nombre}</span> quedará como inactivo en el sistema.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Boton type="button" variante="secundario" onClick={() => setConfirmandoBaja(null)}>Cancelar</Boton>
+              <Boton
+                type="button"
+                className="bg-red-500 hover:bg-red-600 text-white border-none"
+                onClick={() => handleDarDeBaja(confirmandoBaja)}
+              >
+                Sí, dar de baja
+              </Boton>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ── MODAL: Añadir nuevo personal ── */}
       <Modal isOpen={modalNuevo} onClose={() => setModalNuevo(false)} titulo="Añadir Nuevo Personal">
         <form onSubmit={handleCrear} className="space-y-4">
           <Input
-            label="Nombre Completo"
-            placeholder="Ej. Dr. Juan Pérez"
-            required
+            label="Nombre Completo" placeholder="Ej. Dr. Juan Pérez" required
             value={nuevoEmpleado.nombre}
             onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, nombre: e.target.value })}
           />
@@ -298,37 +375,40 @@ export function DirectorioPersonal() {
           <Select
             label="Tipo de Personal"
             value={nuevoEmpleado.tipo}
-            onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, tipo: e.target.value, rol: "" })}
+            onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, tipo: e.target.value, rol: "", id_especialidad: "" })}
           >
             <option value="doctor">Doctor(a)</option>
             <option value="enfermero">Enfermero(a)</option>
             <option value="administrativo">Administrativo</option>
           </Select>
 
-          {/* Selector Dinámico de Especialidad / Rol */}
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-[#1d1d1f]">
-              {nuevoEmpleado.tipo === 'doctor' ? 'Especialidad Médica' : 
-               nuevoEmpleado.tipo === 'enfermero' ? 'Área de Enfermería' : 'Puesto Administrativo'}
+              {nuevoEmpleado.tipo === "doctor" ? "Especialidad Médica" :
+               nuevoEmpleado.tipo === "enfermero" ? "Área de Enfermería" : "Puesto Administrativo"}
             </label>
             <select
               required
               className="px-4 py-2.5 bg-gray-50/50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 border border-black/[0.05] shadow-sm w-full"
-              value={nuevoEmpleado.rol}
-              onChange={(e) => setNuevoEmpleado({...nuevoEmpleado, rol: e.target.value})}
+              value={nuevoEmpleado.tipo === "doctor" ? nuevoEmpleado.id_especialidad : nuevoEmpleado.rol}
+              onChange={(e) => {
+
+                if (nuevoEmpleado.tipo === "doctor") {
+                  setNuevoEmpleado({ ...nuevoEmpleado, id_especialidad: e.target.value, rol: e.target.options[e.target.selectedIndex].text });
+                } else {
+                  setNuevoEmpleado({ ...nuevoEmpleado, rol: e.target.value });
+                }
+              }}
             >
               <option value="">Seleccionar opción...</option>
-              {nuevoEmpleado.tipo === 'doctor' && (
+              {nuevoEmpleado.tipo === "doctor" && (
                 <>
                   {especialidades.map((esp) => (
-                    <option key={esp.id_especialidad} value={esp.id_especialidad}>
-                      {esp.nombre}
-                    </option>
+                    <option key={esp.id_especialidad} value={esp.id_especialidad}>{esp.nombre}</option>
                   ))}
-                  <option value="General">Médico General</option>
                 </>
               )}
-              {nuevoEmpleado.tipo === 'enfermero' && (
+              {nuevoEmpleado.tipo === "enfermero" && (
                 <>
                   <option value="Enfermería General">Enfermería General</option>
                   <option value="UCI">UCI (Cuidados Intensivos)</option>
@@ -336,7 +416,7 @@ export function DirectorioPersonal() {
                   <option value="Pediatría">Enfermería Pediátrica</option>
                 </>
               )}
-              {nuevoEmpleado.tipo === 'administrativo' && (
+              {nuevoEmpleado.tipo === "administrativo" && (
                 <>
                   <option value="Recepción">Recepción</option>
                   <option value="Recursos Humanos">Recursos Humanos</option>
@@ -347,56 +427,44 @@ export function DirectorioPersonal() {
             </select>
           </div>
 
-          {/* Mostrar campos extra SOLO para Doctores y Enfermeros */}
-          {nuevoEmpleado.tipo !== 'administrativo' && (
+          {nuevoEmpleado.tipo !== "administrativo" && (
             <div className="grid grid-cols-2 gap-4">
-              {nuevoEmpleado.tipo === 'doctor' && (
+              {nuevoEmpleado.tipo === "doctor" && (
                 <Input
-                  label="Cédula Profesional"
-                  placeholder="Ej. 1234567"
+                  label="Cédula Profesional" placeholder="Ej. 1234567"
                   value={nuevoEmpleado.cedula_profesional}
                   onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, cedula_profesional: e.target.value })}
                 />
               )}
               <Input
-                label="Teléfono"
-                placeholder="Ej. 555 123 4567"
+                label="Teléfono" placeholder="Ej. 555 123 4567"
                 value={nuevoEmpleado.telefono}
                 onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, telefono: e.target.value })}
               />
               <Input
-                label="Correo Electrónico"
-                type="email"
-                placeholder="Ej. usuario@hospital.com"
+                label="Correo Electrónico" type="email" placeholder="Ej. usuario@hospital.com"
                 value={nuevoEmpleado.correo}
                 onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, correo: e.target.value })}
               />
-
-              {nuevoEmpleado.tipo === 'doctor' && (
+              {nuevoEmpleado.tipo === "doctor" && (
                 <Select
                   label="Consultorio"
                   value={nuevoEmpleado.consultorio}
                   onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, consultorio: e.target.value })}
                 >
                   <option value="">Seleccione un consultorio...</option>
-                  {Array.isArray(consultorios) && consultorios.map((cons) => (
-                    <option key={cons.id_consultorio} value={cons.id_consultorio}>
-                      {cons.nombre_consultorio}
-                    </option>
+                  {consultorios.map((cons) => (
+                    <option key={cons.id_consultorio} value={cons.id_consultorio}>{cons.nombre_consultorio}</option>
                   ))}
                 </Select>
               )}
-
               <Input
-                label="Usuario (Sistema)"
-                placeholder="Ej. dr.perez"
+                label="Usuario (Sistema)" placeholder="Ej. dr.perez"
                 value={nuevoEmpleado.usuario}
                 onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, usuario: e.target.value })}
               />
               <Input
-                label="Contraseña"
-                type="password"
-                placeholder="••••••••"
+                label="Contraseña" type="password" placeholder="••••••••"
                 value={nuevoEmpleado.contrasena}
                 onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, contrasena: e.target.value })}
               />
@@ -410,41 +478,39 @@ export function DirectorioPersonal() {
         </form>
       </Modal>
 
-      {/* Modal Edición de Personal */}
+      {/* ── MODAL: Editar personal ── */}
       <Modal isOpen={!!empleadoAEditar} onClose={() => setEmpleadoAEditar(null)} titulo="Editar Datos del Personal">
         {empleadoAEditar && (
           <form onSubmit={handleGuardarEdicion} className="space-y-4">
             <Input
-              label="Nombre Completo"
-              required
+              label="Nombre Completo" required
               value={empleadoAEditar.nombre || ""}
               onChange={(e) => setEmpleadoAEditar({ ...empleadoAEditar, nombre: e.target.value })}
             />
-            
-            {/* Selector Dinámico de Especialidad / Rol para Edición */}
+
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-[#1d1d1f]">
-                {empleadoAEditar.tipo === 'doctor' ? 'Especialidad Médica' : 
-                 empleadoAEditar.tipo === 'enfermero' ? 'Área de Enfermería' : 'Puesto Administrativo'}
+                {empleadoAEditar.tipo === "doctor" ? "Especialidad Médica" :
+                 empleadoAEditar.tipo === "enfermero" ? "Área de Enfermería" : "Puesto Administrativo"}
               </label>
               <select
-                required
                 className="px-4 py-2.5 bg-gray-50/50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 border border-black/[0.05] shadow-sm w-full"
-                value={empleadoAEditar.rol || ''}
-                onChange={(e) => setEmpleadoAEditar({...empleadoAEditar, rol: e.target.value})}
+                value={empleadoAEditar.tipo === "doctor" ? (empleadoAEditar.id_especialidad ?? "") : (empleadoAEditar.rol || "")}
+                onChange={(e) => {
+                  if (empleadoAEditar.tipo === "doctor") {
+                    setEmpleadoAEditar({ ...empleadoAEditar, id_especialidad: e.target.value });
+                  } else {
+                    setEmpleadoAEditar({ ...empleadoAEditar, rol: e.target.value });
+                  }
+                }}
               >
                 <option value="">Seleccionar opción...</option>
-                {empleadoAEditar.tipo === 'doctor' && (
-                  <>
-                    {especialidades.map((esp) => (
-                      <option key={esp.id_especialidad} value={esp.id_especialidad}>
-                        {esp.nombre}
-                      </option>
-                    ))}
-                    <option value="General">Médico General</option>
-                  </>
+                {empleadoAEditar.tipo === "doctor" && (
+                  especialidades.map((esp) => (
+                    <option key={esp.id_especialidad} value={esp.id_especialidad}>{esp.nombre}</option>
+                  ))
                 )}
-                {empleadoAEditar.tipo === 'enfermero' && (
+                {empleadoAEditar.tipo === "enfermero" && (
                   <>
                     <option value="Enfermería General">Enfermería General</option>
                     <option value="UCI">UCI (Cuidados Intensivos)</option>
@@ -452,7 +518,7 @@ export function DirectorioPersonal() {
                     <option value="Pediatría">Enfermería Pediátrica</option>
                   </>
                 )}
-                {empleadoAEditar.tipo === 'administrativo' && (
+                {empleadoAEditar.tipo === "administrativo" && (
                   <>
                     <option value="Recepción">Recepción</option>
                     <option value="Recursos Humanos">Recursos Humanos</option>
@@ -463,7 +529,7 @@ export function DirectorioPersonal() {
               </select>
             </div>
 
-            {empleadoAEditar.tipo === 'doctor' && (
+            {empleadoAEditar.tipo === "doctor" && (
               <div className="grid grid-cols-2 gap-4">
                 <Input
                   label="Cédula Profesional"
@@ -476,8 +542,7 @@ export function DirectorioPersonal() {
                   onChange={(e) => setEmpleadoAEditar({ ...empleadoAEditar, telefono: e.target.value })}
                 />
                 <Input
-                  label="Correo Electrónico"
-                  type="email"
+                  label="Correo Electrónico" type="email"
                   value={empleadoAEditar.correo || ""}
                   onChange={(e) => setEmpleadoAEditar({ ...empleadoAEditar, correo: e.target.value })}
                 />
@@ -487,10 +552,8 @@ export function DirectorioPersonal() {
                   onChange={(e) => setEmpleadoAEditar({ ...empleadoAEditar, consultorio: e.target.value })}
                 >
                   <option value="">Seleccione un consultorio...</option>
-                  {Array.isArray(consultorios) && consultorios.map((cons) => (
-                    <option key={cons.id_consultorio} value={cons.id_consultorio}>
-                      {cons.nombre_consultorio}
-                    </option>
+                  {consultorios.map((cons) => (
+                    <option key={cons.id_consultorio} value={cons.id_consultorio}>{cons.nombre_consultorio}</option>
                   ))}
                 </Select>
               </div>
@@ -516,7 +579,7 @@ export function DirectorioPersonal() {
         )}
       </Modal>
 
-      {/* Modal Detalles del Perfil */}
+      {/* ── MODAL: Perfil ── */}
       <Modal isOpen={!!empleadoSeleccionado} onClose={() => setEmpleadoSeleccionado(null)} titulo="Perfil del Personal">
         {empleadoSeleccionado && (
           <div className="space-y-6 text-center">
@@ -529,60 +592,25 @@ export function DirectorioPersonal() {
             </div>
 
             <div className="bg-gray-50 p-4 rounded-2xl border border-black/[0.05] text-left space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-[#86868b]">Estado Actual</span>
-                <span className={`text-xs font-semibold uppercase tracking-wider px-2 py-1 rounded-md ${empleadoSeleccionado.estado === 'En Turno' ? 'bg-green-100 text-green-700' :
-                  empleadoSeleccionado.estado === 'En Consulta' ? 'bg-blue-100 text-blue-700' :
-                    empleadoSeleccionado.estado === 'Disponible' ? 'bg-green-100 text-green-700' :
-                      empleadoSeleccionado.estado === 'En Ruta' ? 'bg-orange-100 text-orange-700' :
-                        'bg-gray-100 text-gray-600'
-                  }`}>
-                  {empleadoSeleccionado.estado}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-[#86868b]">Tipo de Personal</span>
-                <span className="text-sm font-medium text-[#1d1d1f] capitalize">{empleadoSeleccionado.tipo}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-[#86868b]">ID Empleado</span>
-                <span className="text-sm font-mono text-[#1d1d1f]">{empleadoSeleccionado.id}</span>
-              </div>
+              {([
+                ["Estado",         <span className={`text-xs font-semibold uppercase tracking-wider px-2 py-1 rounded-md ${colorEstado(empleadoSeleccionado.estado)}`}>{empleadoSeleccionado.estado}</span>],
+                ["Tipo",           <span className="capitalize">{empleadoSeleccionado.tipo}</span>],
+                ["ID Empleado",    empleadoSeleccionado.id],
+                ...(empleadoSeleccionado.cedula_profesional ? [["Cédula", empleadoSeleccionado.cedula_profesional]] : []),
+                ...(empleadoSeleccionado.telefono           ? [["Teléfono", empleadoSeleccionado.telefono]] : []),
+                ...(empleadoSeleccionado.correo             ? [["Correo", empleadoSeleccionado.correo]] : []),
+                ...(empleadoSeleccionado.consultorio        ? [["Consultorio", empleadoSeleccionado.consultorio]] : []),
+                ...(empleadoSeleccionado.usuario            ? [["Usuario", empleadoSeleccionado.usuario]] : []),
+              ] as [string, React.ReactNode][]).map(([label, value]) => (
+                <div key={label} className="flex justify-between items-center">
+                  <span className="text-sm text-[#86868b]">{label}</span>
+                  <span className="text-sm font-medium text-[#1d1d1f]">{value}</span>
+                </div>
+              ))}
+            </div>
 
-              {empleadoSeleccionado.tipo === 'doctor' && (
-                <>
-                  {empleadoSeleccionado.cedula_profesional && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-[#86868b]">Cédula Profesional</span>
-                      <span className="text-sm font-medium text-[#1d1d1f]">{empleadoSeleccionado.cedula_profesional}</span>
-                    </div>
-                  )}
-                  {empleadoSeleccionado.telefono && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-[#86868b]">Teléfono</span>
-                      <span className="text-sm font-medium text-[#1d1d1f]">{empleadoSeleccionado.telefono}</span>
-                    </div>
-                  )}
-                  {empleadoSeleccionado.correo && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-[#86868b]">Correo</span>
-                      <span className="text-sm font-medium text-[#1d1d1f]">{empleadoSeleccionado.correo}</span>
-                    </div>
-                  )}
-                  {empleadoSeleccionado.consultorio && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-[#86868b]">Consultorio</span>
-                      <span className="text-sm font-medium text-[#1d1d1f]">{empleadoSeleccionado.consultorio}</span>
-                    </div>
-                  )}
-                  {empleadoSeleccionado.usuario && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-[#86868b]">Usuario</span>
-                      <span className="text-sm font-medium text-[#1d1d1f]">{empleadoSeleccionado.usuario}</span>
-                    </div>
-                  )}
-                </>
-              )}
+            <div className="flex flex-col gap-3 pt-4 border-t border-black/[0.05]">
+              <Boton variante="secundario" onClick={() => setEmpleadoSeleccionado(null)}>Cerrar</Boton>
             </div>
           </div>
         )}

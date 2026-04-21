@@ -271,7 +271,7 @@ export function ModuloPacientes() {
       </header>
 
       {/* TABS */}
-      <div className="flex gap-0.5 border-b border-black/[0.06] overflow-x-auto">
+      <div className="flex gap-0.5 border-b border-black/[0.06] overflow-visible">
         {tabs.map(tab => (
           <button
             key={tab.key}
