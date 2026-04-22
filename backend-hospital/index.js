@@ -28,26 +28,39 @@ const verificarJWT = (req, res, next) => {
   } catch (error) { return res.status(401).json({ error: "Gafete inválido o expirado." }); }
 };
 
+function formatearTelefono(tel) {
+  const digits = String(tel).replace(/\D/g, '');
+  if (digits.length < 10) throw new Error('Número inválido');
+  return digits.startsWith('52') ? digits : '52' + digits;
+}
 // ==========================================
 // --- LOGIN (PÚBLICO) ---
 // ==========================================
 app.post('/api/login', async (req, res) => {
   const { usuario, contrasena } = req.body;
+  if (!usuario || !contrasena) return res.status(400).json({ error: "Usuario y contraseña requeridos." });
+
   try {
-    const result = await pool.query('SELECT * FROM doctores WHERE usuario = $1 AND estado != $2', [usuario, 'Inactivo']);
-    if (result.rows.length === 0) return res.status(401).json({ error: "Unauthorized."});
-    
-    const empleado = result.rows[0];
-    const valida = await bcrypt.compare(contrasena, empleado.contrasena);
+    const result = await pool.query(
+      'SELECT id, nombre, usuario, contrasena, puesto FROM administrativos WHERE usuario = $1',
+      [usuario]
+    );
+    if (result.rows.length === 0) return res.status(401).json({ error: "Usuario no encontrado." });
+
+    const admin = result.rows[0];
+    const valida = await bcrypt.compare(contrasena, admin.contrasena);
     if (!valida) return res.status(401).json({ error: "Contraseña incorrecta." });
 
     const token = jwt.sign(
-      { id: empleado.id_doctor, nombre: empleado.nombre_doctor },
+      { id: admin.id, nombre: admin.nombre, puesto: admin.puesto, rol: 'administrativo' },
       process.env.JWT_SECRET || 'secreto_temporal',
       { expiresIn: '10h' }
     );
-    res.json({ message: "Bienvenido", token, usuario: empleado.nombre_doctor });
-  } catch (error) { res.status(500).json({ error: error.message }); }
+    res.json({ message: "Bienvenido", token, usuario: admin.nombre, puesto: admin.puesto });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // 🚨 APLICAMOS SEGURIDAD A TODAS LAS RUTAS DESPUÉS DEL LOGIN
@@ -355,7 +368,7 @@ app.get('/api/personal/completo', async (req, res) => {
 
 
 // --- ADMINISTRATIVOS ---
-app.post('/api/administrativos', async (req, res) => {
+app.post('/api/administrativos', async (req, res) => {    //Obtener
   const { nombre, puesto, usuario, contrasena } = req.body; 
   
   if (!nombre || !usuario || !contrasena) {
@@ -377,7 +390,7 @@ app.post('/api/administrativos', async (req, res) => {
   }
 });
 
-app.route('/api/administrativos/:id')
+app.route('/api/administrativos/:id')   //Editar
   .put(async (req, res) => {
     const { id } = req.params;
     const { nombre, puesto, usuario } = req.body;
@@ -403,7 +416,7 @@ app.route('/api/administrativos/:id')
         [id]
       );
       if (result.rowCount === 0) return res.status(404).json({ error: 'Administrativo no encontrado' });
-      res.json({ message: "Administrativo eliminado correctamente" });
+      res.json({ message: "Correcto" });
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: error.message });
@@ -414,32 +427,24 @@ app.route('/api/administrativos/:id')
 //            --- ENFERMEROS ---
 // ==========================================
 app.post('/api/enfermeros', async (req, res) => {
-  const { nombre, apellido, tipo_auxiliar, area, turno, telefono, correo } = req.body;
-  
-  if (!nombre || !apellido || !tipo_auxiliar) {
-    return res.status(400).json({ error: "Faltan datos obligatorios (Nombre, Apellido, Tipo)." });
-  }
+  const { nombre, tipo_auxiliar, area, telefono, correo } = req.body;
+  if (!nombre) return res.status(400).json({ error: "Nombre obligatorio" });
 
   try {
+    // Dividimos el nombre para cumplir con la BD
+    const partes = nombre.trim().split(" ");
+    const nom = partes[0];
+    const ape = partes.slice(1).join(" ") || "N/A";
+
     const result = await pool.query(
       `INSERT INTO auxiliares (nombre, apellido, tipo_auxiliar, area, turno, telefono, correo, estado) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'Activo') RETURNING *`,
-      [
-        nombre, 
-        apellido, 
-        tipo_auxiliar, 
-        area || tipo_auxiliar, // Si no viene área, usamos el tipo como área
-        turno || 'Matutino', 
-        telefono || null, 
-        correo || null
-      ]
+       VALUES ($1, $2, $3, $4, 'Matutino', $5, $6, 'Activo') RETURNING *`,
+      [nom, ape, tipo_auxiliar || 'Enfermería', area || 'General', telefono, correo]
     );
     res.status(201).json(result.rows[0]);
-  } catch (error) {
-    console.error("Error al crear auxiliar:", error);
-    res.status(500).json({ error: 'Error al crear auxiliar: ' + error.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
+
 
 app.route('/api/enfermeros/:id')
   .put(async (req, res) => {
@@ -447,15 +452,16 @@ app.route('/api/enfermeros/:id')
     const { nombre, telefono, correo, estado, area } = req.body;
     
     // Separamos nombre y apellido nuevamente
-    const partes = nombre.split(" ");
+    const partes =(nombre || "").trim().split(" ");
     const nombreAux = partes[0];
     const apellidoAux = partes.slice(1).join(" ") || "N/A";
 
     try {
       const result = await pool.query(
-        `UPDATE auxiliares SET nombre = $1, apellido = $2, tipo_auxiliar = $3 
-         WHERE id_auxiliar = $4 RETURNING *`,
-        [nombreAux, apellidoAux, area || 'Enfermería', id]
+        `UPDATE auxiliares 
+         SET nombre = $1, apellido = $2, area = $3, telefono = $4, correo = $5, estado = $6 
+         WHERE id_auxiliar = $7 RETURNING *`,
+        [nombreAux, apellidoAux, area, telefono, correo, estado || 'Activo',id]
       );
       if (result.rowCount === 0) return res.status(404).json({ error: 'Auxiliar no encontrado' });
       res.json({ message: "Auxiliar actualizado correctamente" });

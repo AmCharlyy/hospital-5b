@@ -37,7 +37,7 @@ export function DirectorioPersonal() {
     try {
       const res = await apiFetch("http://localhost:3333/api/personal/completo");
       if (res.status === 401 || res.status === 403) { window.location.reload(); return; }
-      
+
       const data = await res.json();
       if (!Array.isArray(data)) { setEmpleados([]); return; }
 
@@ -46,14 +46,16 @@ export function DirectorioPersonal() {
         const iniciales = partes.length > 1
           ? (partes[0][0] + partes[1][0]).toUpperCase()
           : (emp.nombre || "??").substring(0, 2).toUpperCase();
+        const tipoReal = (emp.tipo || "").toLowerCase().includes("doctor") ? "doctor" :
+          (emp.tipo || "").toLowerCase().includes("admin") ? "administrativo" : "enfermero";
 
         return {
           id: `${emp.tipo.substring(0, 3).toUpperCase()}-${emp.id_real}`,
           id_real: emp.id_real,
           nombre: emp.nombre || "Sin nombre",
-          rol: emp.especialidad || "General",
+          rol: emp.especialidad || "Enfermería",
           id_especialidad: emp.id_especialidad ?? null,
-          tipo: emp.tipo,
+          tipo: tipoReal,
           estado: emp.estado_actual || "Disponible",
           avatar: iniciales,
           cedula_profesional: emp.cedula_profesional || "",
@@ -111,7 +113,7 @@ export function DirectorioPersonal() {
   });
 
   // --- POST: Crear nuevo personal ---
- const handleCrear = async (e: React.FormEvent) => {
+  const handleCrear = async (e: React.FormEvent) => {
     e.preventDefault();
     let endpoint = "";
     if (nuevoEmpleado.tipo === 'doctor') endpoint = "http://localhost:3333/api/doctores";
@@ -121,8 +123,8 @@ export function DirectorioPersonal() {
     if (!endpoint) return alert("Ruta no configurada para este rol.");
 
     // 1. Iniciamos el body con lo básico
-    const body: Record<string, any> = { 
-      nombre: nuevoEmpleado.nombre 
+    const body: Record<string, any> = {
+      nombre: nuevoEmpleado.nombre
     };
 
     // 2. Empacamos según la profesión
@@ -134,25 +136,26 @@ export function DirectorioPersonal() {
       body.contrasena = nuevoEmpleado.contrasena;
       body.consultorio = nuevoEmpleado.consultorio || null;
       body.id_especialidad = nuevoEmpleado.id_especialidad ? Number(nuevoEmpleado.id_especialidad) : null;
-    } 
+    }
     else if (nuevoEmpleado.tipo === "enfermero") {
-      // 🚨 AQUÍ ESTÁ LA CURA PARA LOS ENFERMEROS (AUXILIARES EN BD) 🚨
-      
+      body.tipo_auxiliar = "Enfermería";
+      body.area = nuevoEmpleado.rol;
+
       // Separamos nombre y apellido por si el usuario lo escribió todo junto
       const partes = nuevoEmpleado.nombre.trim().split(" ");
-      body.nombre = partes[0]; 
-      body.apellido = partes.slice(1).join(" ") || "Sin apellido"; 
-      
+      body.nombre = partes[0];
+      body.apellido = partes.slice(1).join(" ") || "Sin apellido";
+
       body.tipo_auxiliar = "Enfermería"; // El backend requiere 'tipo_auxiliar'
       body.area = nuevoEmpleado.rol;     // El área seleccionada (UCI, Urgencias...)
       body.turno = "Matutino";           // Turno por defecto
-      
+
       // Datos de contacto (aunque la tabla de auxiliares actual no tiene login, sí tiene tlf y correo)
       body.telefono = nuevoEmpleado.telefono;
       body.correo = nuevoEmpleado.correo;
       body.usuario = nuevoEmpleado.usuario;
       body.contrasena = nuevoEmpleado.contrasena;
-    } 
+    }
     else {
       // Administrativo
       body.puesto = nuevoEmpleado.rol || "Administrativo General";
@@ -190,54 +193,51 @@ export function DirectorioPersonal() {
   const handleGuardarEdicion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!empleadoAEditar) return;
-    
-    const endpoints: Record<string, string> = {
-      doctor: `http://localhost:3333/api/doctores/${empleadoAEditar.id_real}`,
-      administrativo: `http://localhost:3333/api/administrativos/${empleadoAEditar.id_real}`,
-      enfermero: `http://localhost:3333/api/enfermeros/${empleadoAEditar.id_real}`,
-    };
-    const endpoint = endpoints[empleadoAEditar.tipo];
-    if (!endpoint) return alert("Tipo de personal no soportado para edición.");
 
-    const body: Record<string, any> = { nombre: empleadoAEditar.nombre };
-    
-    if (empleadoAEditar.tipo === "doctor") {
+    const endpoints: any = {
+      doctor: "doctores",
+      administrativo: "administrativos",
+      enfermero: "enfermeros"
+    };
+
+    // 1. Declaramos la variable 'body' que usaremos para todos
+    let body: any = {
+      nombre: empleadoAEditar.nombre,
+      telefono: empleadoAEditar.telefono,
+      correo: empleadoAEditar.correo,
+      estado: empleadoAEditar.estado,
+      usuario: empleadoAEditar.usuario
+    };
+
+    // 2. Agregamos los campos específicos según el tipo
+    if (empleadoAEditar.tipo === 'doctor') {
       body.nombre_doctor = empleadoAEditar.nombre;
-      body.id_especialidad = empleadoAEditar.id_especialidad ? Number(empleadoAEditar.id_especialidad) : null;
-      body.cedula_profesional = empleadoAEditar.cedula_profesional;
-      body.telefono = empleadoAEditar.telefono;
-      body.correo = empleadoAEditar.correo;
-      body.consultorio = empleadoAEditar.consultorio || null;
-      body.estado = empleadoAEditar.estado || "Disponible";
-    } else if (empleadoAEditar.tipo === "enfermero") {
-      body.telefono = empleadoAEditar.telefono;
-      body.correo = empleadoAEditar.correo;
-      body.estado = empleadoAEditar.estado || "Activo";
+      body.id_especialidad = empleadoAEditar.id_especialidad;
+      body.consultorio = empleadoAEditar.consultorio;
+    } else if (empleadoAEditar.tipo === 'enfermero') {
       body.area = empleadoAEditar.rol;
     } else {
-      body.puesto = empleadoAEditar.rol || "Administrativo General";
-      body.usuario = empleadoAEditar.usuario;
+      body.puesto = empleadoAEditar.rol;
     }
 
     try {
-      const res = await fetch(endpoint, {
-        method: "PUT",
-        headers: getHeaders(),
-        body: JSON.stringify(body),
+      // 3. Enviamos 'body' al servidor
+      const res = await apiFetch(`http://localhost:3333/api/${endpoints[empleadoAEditar.tipo]}/${empleadoAEditar.id_real}`, {
+        method: 'PUT',
+        body: JSON.stringify(body) // Usamos 'body' aquí
       });
 
       if (res.ok) {
         setEmpleadoAEditar(null);
         fetchEmpleados();
-        fetchConsultorios();
-        alert("Datos actualizados correctamente");
+        alert("¡Datos actualizados!");
       } else {
-        const errorData = await res.json();
-        alert("Error: " + errorData.error);
+        const err = await res.json();
+        alert("Error: " + err.error);
       }
     } catch (error) {
       console.error(error);
-      alert("Error al actualizar.");
+      alert("Error de conexión");
     }
   };
 
@@ -287,7 +287,7 @@ export function DirectorioPersonal() {
       ? "text-sm font-semibold text-[#1d1d1f] border-b-2 border-[#1d1d1f] pb-4 -mb-4 transition-colors"
       : "text-sm font-medium text-[#86868b] hover:text-[#1d1d1f] pb-4 -mb-4 transition-colors";
 
-    const getEstadoColor = (estado: string): string => {
+  const getEstadoColor = (estado: string): string => {
     switch (estado) {
       case "ACTIVO": return "bg-green-500";
       case "BAJA": return "bg-red-500"; // O "Eliminado" si así lo manejas
@@ -345,7 +345,7 @@ export function DirectorioPersonal() {
                   opciones={[
                     { etiqueta: "Ver Perfil", accion: () => setEmpleadoSeleccionado(empleado) },
                     { etiqueta: "Editar Datos", accion: () => setEmpleadoAEditar(empleado) },
-                    
+
                     // Botón Inteligente: Reingresar si está dado de baja, Eliminar si está activo
                     empleado.estado === 'Inactivo' || empleado.estado === 'Eliminado'
                       ? { etiqueta: "Reingresar al Sistema", accion: () => handleReingresarPersonal(empleado), peligro: false }
@@ -411,7 +411,7 @@ export function DirectorioPersonal() {
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-[#1d1d1f]">
               {nuevoEmpleado.tipo === "doctor" ? "Especialidad Médica" :
-               nuevoEmpleado.tipo === "enfermero" ? "Área de Enfermería" : "Puesto Administrativo"}
+                nuevoEmpleado.tipo === "enfermero" ? "Área de Enfermería" : "Puesto Administrativo"}
             </label>
             <select
               required
@@ -507,7 +507,7 @@ export function DirectorioPersonal() {
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-[#1d1d1f]">
                 {empleadoAEditar.tipo === "doctor" ? "Especialidad Médica" :
-                 empleadoAEditar.tipo === "enfermero" ? "Área de Enfermería" : "Puesto Administrativo"}
+                  empleadoAEditar.tipo === "enfermero" ? "Área de Enfermería" : "Puesto Administrativo"}
               </label>
               <select
                 className="px-4 py-2.5 bg-gray-50/50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 border border-black/[0.05] shadow-sm w-full"
@@ -588,9 +588,8 @@ export function DirectorioPersonal() {
               value={empleadoAEditar.estado || "Disponible"}
               onChange={(e) => setEmpleadoAEditar({ ...empleadoAEditar, estado: e.target.value })}
             >
-              <option value="Disponible">Disponible</option>
+              <option value="Activo">Activo</option>
               <option value="En Consulta">En Consulta</option>
-              <option value="En Turno">En Turno</option>
               <option value="Descanso">Descanso</option>
               <option value="Ausente">Ausente</option>
             </Select>
