@@ -60,7 +60,7 @@ export function MenuDropdown({ opciones }: Props) {
       <button
         ref={botonRef}
         onClick={abrirMenu}
-        className="p-2 text-[#86868b] hover:text-[#1d1d1f] hover:bg-black/5 rounded-xl transition-colors"
+        className="p-2 text-[#86868b] hover:text-[#071952] hover:bg-[#EBF4F6] rounded-xl transition-colors"
       >
         <MoreHorizontal className="w-5 h-5" />
       </button>
@@ -84,8 +84,8 @@ export function MenuDropdown({ opciones }: Props) {
                 opcion.accion();
               }}
               className={cn(
-                "w-full text-left px-4 py-2.5 text-sm font-medium transition-colors hover:bg-black/5",
-                opcion.peligro ? "text-red-600" : "text-[#1d1d1f]"
+                "w-full text-left px-4 py-2.5 text-sm font-medium transition-colors hover:bg-[#EBF4F6]",
+                opcion.peligro ? "text-red-600" : "text-[#071952]"
               )}
             >
               {opcion.etiqueta}

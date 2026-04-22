@@ -9,12 +9,12 @@ interface Props extends SelectHTMLAttributes<HTMLSelectElement> {
 export const Select = forwardRef<HTMLSelectElement, Props>(({ label, className, children, ...props }, ref) => {
   return (
     <div className="flex flex-col gap-1.5 w-full">
-      {label && <label className="text-sm font-medium text-[#1d1d1f]">{label}</label>}
+      {label && <label className="text-sm font-medium text-[#071952]">{label}</label>}
       <div className="relative">
         <select
           ref={ref}
           className={cn(
-            "w-full px-4 py-2.5 bg-white rounded-xl text-sm font-medium text-[#1d1d1f] border border-black/[0.05] focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm transition-all appearance-none pr-10",
+            "w-full px-4 py-2.5 bg-white rounded-xl text-sm font-medium text-[#071952] border border-black/[0.05] focus:outline-none focus:ring-2 focus:ring-[#088395]/30 shadow-sm transition-all appearance-none pr-10",
             className
           )}
           {...props}

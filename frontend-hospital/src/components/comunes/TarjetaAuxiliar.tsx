@@ -18,11 +18,11 @@ export function TarjetaAuxiliar({ auxiliar, onClick, opciones }: Props) {
       className="flex items-center justify-between p-4 rounded-2xl border border-black/[0.05] hover:shadow-md transition-all cursor-pointer group bg-white hover:scale-[1.01] overflow-visible"
     >
       <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-100 to-purple-50 flex items-center justify-center text-purple-600 font-semibold text-lg">
+        <div className="w-12 h-12 rounded-full bg-[#EBF4F6] flex items-center justify-center text-[#088395] font-semibold text-lg">
           {getAvatar()}
         </div>
         <div>
-          <h3 className="text-[15px] font-semibold text-[#1d1d1f] group-hover:text-light_aqua transition-colors">
+          <h3 className="text-[15px] font-semibold text-[#071952] group-hover:text-[#37B7C3] transition-colors">
             {auxiliar.nombre} {auxiliar.apellido}
           </h3>
           <p className="text-sm text-[#86868b] capitalize">{auxiliar.tipo_auxiliar}</p>
@@ -33,9 +33,9 @@ export function TarjetaAuxiliar({ auxiliar, onClick, opciones }: Props) {
         {opciones && <MenuDropdown opciones={opciones} />}
         
         <span className={`text-[11px] font-semibold uppercase tracking-wider px-2 py-1 rounded-md ${
-          auxiliar.turno === 'Día' ? 'bg-amber-100 text-amber-700' :
+          auxiliar.turno === 'Día' ? 'bg-[#EBF4F6] text-[#088395]' :
           auxiliar.turno === 'Tarde' ? 'bg-orange-100 text-orange-700' :
-          auxiliar.turno === 'Noche' ? 'bg-indigo-100 text-indigo-700' :
+          auxiliar.turno === 'Noche' ? 'bg-[#071952] text-white' :
           'bg-gray-100 text-gray-600'
         }`}>
           Turno {auxiliar.turno}

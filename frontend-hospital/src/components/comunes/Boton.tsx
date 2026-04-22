@@ -10,8 +10,10 @@ export function Boton({ variante = "primario", className, children, ...props }: 
     <button
       className={cn(
         "px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2",
-        variante === "primario" && "bg-blue-600 text-white hover:bg-blue-700 shadow-sm",
-        variante === "secundario" && "bg-white text-[#1d1d1f] border border-black/[0.05] hover:bg-gray-50 shadow-sm",
+        // Color Primario: Navy con hover Teal
+        variante === "primario" && "bg-[#071952] text-white hover:bg-[#088395] shadow-sm",
+        // Color Secundario: Blanco con borde Aqua y texto Teal, hover Off-White
+        variante === "secundario" && "bg-white text-[#088395] border border-[#37B7C3] hover:bg-[#EBF4F6] shadow-sm",
         variante === "peligro" && "bg-red-50 text-red-600 hover:bg-red-100",
         className
       )}

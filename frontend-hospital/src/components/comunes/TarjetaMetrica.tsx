@@ -15,7 +15,7 @@ export function TarjetaMetrica({ etiqueta, valor, Icono, colorTexto, colorFondo 
         <Icono className={`w-6 h-6 ${colorTexto}`} />
       </div>
       <p className="text-sm font-medium text-[#86868b]">{etiqueta}</p>
-      <p className="text-3xl font-semibold tracking-tight text-[#1d1d1f] mt-1">{valor}</p>
+      <p className="text-3xl font-semibold tracking-tight text-[#071952] mt-1">{valor}</p>
     </div>
   );
 }

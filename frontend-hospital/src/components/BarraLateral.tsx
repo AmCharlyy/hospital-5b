@@ -8,7 +8,6 @@ interface Props {
 
 export function BarraLateral({ pestanaActiva, setPestanaActiva }: Props) {
   const elementosNavegacion = [
-
     { id: "pacientes", etiqueta: "Pacientes", Icono: UserPlus },
     { id: "personal", etiqueta: "Personal Médico", Icono: Users },
     { id: "auxiliares", etiqueta: "Auxiliares", Icono: Shield },
@@ -26,7 +25,7 @@ export function BarraLateral({ pestanaActiva, setPestanaActiva }: Props) {
             className="w-full h-full object-contain p-1"
           />
         </div>
-        <span className="font-semibold text-lg tracking-tight text-[#1d1d1f]">CHEPA'S Hospital</span>
+        <span className="font-semibold text-lg tracking-tight text-[#071952]">CHEPA'S Hospital</span>
       </div>
       <nav className="flex-1 space-y-1">
         {elementosNavegacion.map((item) => {
@@ -37,13 +36,16 @@ export function BarraLateral({ pestanaActiva, setPestanaActiva }: Props) {
               key={item.id}
               onClick={() => setPestanaActiva(item.id)}
               className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group",
                 estaActivo
-                  ? "bg-white text-blue-600 shadow-[0_2px_10px_rgba(0,0,0,0.04)]"
-                  : "text-[#86868b] hover:bg-black/5 hover:text-[#1d1d1f]"
+                  ? "bg-white text-[#071952] shadow-[0_2px_10px_rgba(0,0,0,0.04)]"
+                  : "text-[#86868b] hover:bg-[#EBF4F6] hover:text-[#071952]"
               )}
             >
-              <Icono className={cn("w-5 h-5", estaActivo ? "text-blue-600" : "text-[#86868b]")} />
+              <Icono className={cn(
+                "w-5 h-5 transition-colors", 
+                estaActivo ? "text-[#088395]" : "text-[#86868b] group-hover:text-[#37B7C3]"
+              )} />
               {item.etiqueta}
             </button>
           );
@@ -51,12 +53,7 @@ export function BarraLateral({ pestanaActiva, setPestanaActiva }: Props) {
       </nav>
 
       <div className="mt-auto pt-6 border-t border-black/5">
-        {/*<button onClick={() => { localStorage.removeItem('hospital_token'); window.location.reload(); }}>
-  Cerrar Sesión
-</button>*/}
-
-
-        <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#86868b] hover:bg-black/5 hover:text-[#1d1d1f] transition-all duration-200"
+        <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#86868b] hover:bg-[#EBF4F6] hover:text-[#071952] transition-all duration-200 group"
           onClick={() => { localStorage.removeItem('hospital_token'); window.location.reload(); }}
         >
          Log Out
