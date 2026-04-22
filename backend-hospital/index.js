@@ -7,6 +7,8 @@ const pool = require('./db');
 
 const app = express();
 
+app.disable('x-powered-by');
+
 app.use(cors());
 app.use(express.json());
 
@@ -33,7 +35,7 @@ app.post('/api/login', async (req, res) => {
   const { usuario, contrasena } = req.body;
   try {
     const result = await pool.query('SELECT * FROM doctores WHERE usuario = $1 AND estado != $2', [usuario, 'Inactivo']);
-    if (result.rows.length === 0) return res.status(404).json({ error: "Usuario no encontrado." });
+    if (result.rows.length === 0) return res.status(401).json({ error: "Unauthorized."});
     
     const empleado = result.rows[0];
     const valida = await bcrypt.compare(contrasena, empleado.contrasena);
@@ -605,10 +607,10 @@ app.route('/api/pacientes')
 
     try {
       const estadoRes = await pool.query(
-        `SELECT id_estado FROM estado_flujo_paciente WHERE nombre_estado ILIKE 'EN ESPERA' LIMIT 1`
+        `SELECT id_estado FROM status WHERE nombre_estado ILIKE 'Registrado' LIMIT 1`
       );
       if (estadoRes.rows.length === 0) {
-        return res.status(500).json({ error: "No existe el estado 'EN ESPERA' en estado_flujo_paciente." });
+        return res.status(500).json({ error: "No existe el estado 'EN ESPERA' en status." });
       }
       const idEnEspera = estadoRes.rows[0].id_estado;
 
