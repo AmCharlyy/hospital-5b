@@ -287,6 +287,14 @@ export function DirectorioPersonal() {
       ? "text-sm font-semibold text-[#1d1d1f] border-b-2 border-[#1d1d1f] pb-4 -mb-4 transition-colors"
       : "text-sm font-medium text-[#86868b] hover:text-[#1d1d1f] pb-4 -mb-4 transition-colors";
 
+    const getEstadoColor = (estado: string): string => {
+    switch (estado) {
+      case "ACTIVO": return "bg-green-500";
+      case "BAJA": return "bg-red-500"; // O "Eliminado" si así lo manejas
+      default: return "bg-gray-400";
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -332,6 +340,7 @@ export function DirectorioPersonal() {
                 <TarjetaEmpleado
                   key={empleado.id}
                   empleado={empleado}
+                  colorEstado={getEstadoColor(empleado.estado)}
                   onClick={() => setEmpleadoSeleccionado(empleado)}
                   opciones={[
                     { etiqueta: "Ver Perfil", accion: () => setEmpleadoSeleccionado(empleado) },

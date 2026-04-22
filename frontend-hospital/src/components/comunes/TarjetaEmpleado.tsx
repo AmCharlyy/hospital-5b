@@ -11,11 +11,12 @@ export interface Empleado {
 
 interface Props {
   empleado: Empleado;
+  colorEstado: string;
   onClick?: () => void;
   opciones?: OpcionDropdown[];
 }
 
-export function TarjetaEmpleado({ empleado, onClick, opciones }: Props) {
+export function TarjetaEmpleado({ empleado, onClick, opciones }: Props) {  
   return (
     <div 
       onClick={onClick}
