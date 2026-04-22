@@ -478,7 +478,6 @@ export function ModuloPacientes() {
         </div>
       </Modal>
 
-      {/* ── MODAL: Expediente ── */}
       {/* ── MODAL: Expediente y Panel de Control ── */}
       <Modal isOpen={!!pacienteSeleccionado} onClose={() => setPacienteSeleccionado(null)} titulo="Expediente del Paciente">
         {pacienteSeleccionado && (
