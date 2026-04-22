@@ -264,23 +264,6 @@ app.put('/api/habitaciones/:id/estado', async (req, res) => {
 //       --- Auxiliares ---
 //================================
 
-(async function ensureAuxiliaresTable() {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS auxiliares (
-        id_auxiliar SERIAL PRIMARY KEY,
-        nombre TEXT NOT NULL,
-        apellido TEXT NOT NULL,
-        tipo_auxiliar TEXT NOT NULL,
-        turno TEXT NOT NULL
-      );
-    `);
-    console.log('Tabla auxiliares verificada');
-  } catch (error) {
-    console.error('Error al crear/verificar la tabla auxiliares:', error);
-  }
-})();
-
 app.route('/api/auxiliares')
   .get(async (req, res) => {  //ObtenerAuxiliares
     try {
