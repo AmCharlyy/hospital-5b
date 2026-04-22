@@ -9,6 +9,7 @@ import { Boton } from "./comunes/Boton";
 import { Modal } from "./comunes/Modal";
 import { Input } from "./comunes/Input";
 import { Select } from "./comunes/Select";
+import { apiFetch } from "../api";
 
 // --- VARIANTS PARA ANIMACIONES ---
 const containerVariants = {
@@ -52,10 +53,10 @@ export function ModuloAgenda() {
   const cargarDatos = async () => {
     try {
       const [resCitas, resPacientes, resDoctores, resConsultorios] = await Promise.all([
-        fetch("http://localhost:3333/api/citas"),
-        fetch("http://localhost:3333/api/pacientes/completo"),
-        fetch("http://localhost:3333/api/doctores/estado"),
-        fetch("http://localhost:3333/api/consultorios")
+        apiFetch("http://localhost:3333/api/citas"),
+        apiFetch("http://localhost:3333/api/pacientes/completo"),
+        apiFetch("http://localhost:3333/api/doctores/estado"),
+        apiFetch("http://localhost:3333/api/consultorios")
       ]);
       setCitas(await resCitas.json());
       setPacientes(await resPacientes.json());
@@ -102,7 +103,7 @@ export function ModuloAgenda() {
     if (!nuevaCita.id_paciente || !nuevaCita.id_doctor) return;
     
     try {
-      const respuesta = await fetch("http://localhost:3333/api/citas", {
+      const respuesta = await apiFetch("http://localhost:3333/api/citas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(nuevaCita)
@@ -127,7 +128,7 @@ export function ModuloAgenda() {
       const payload: any = { estado: nuevoEstado };
       if (motivo) payload.motivo_cancelacion = motivo;
 
-      const respuesta = await fetch(`http://localhost:3333/api/citas/${id_cita}/estado`, {
+      const respuesta = await apiFetch(`http://localhost:3333/api/citas/${id_cita}/estado`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)

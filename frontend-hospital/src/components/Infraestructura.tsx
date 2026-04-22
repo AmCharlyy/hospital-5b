@@ -8,6 +8,7 @@ import { Boton } from "./comunes/Boton";
 import { Select } from "./comunes/Select";
 import { Input } from "./comunes/Input";
 import { useAppStore, Habitacion } from "../context/AppContext";
+import { apiFetch } from "../api";
 
 const AREAS_MAP: Record<number, string> = {
   1: "Medicina General",
@@ -48,7 +49,7 @@ export function Infraestructura() {
   // --- FETCH A LA BASE DE DATOS ---
   const fetchConsultorios = async () => {
     try {
-      const res = await fetch("http://localhost:3333/api/consultorios");
+      const res = await apiFetch("http://localhost:3333/api/consultorios");
       const data = await res.json();
       
       // Mapeamos los datos de la BD para que coincidan con la UI que diseñaste

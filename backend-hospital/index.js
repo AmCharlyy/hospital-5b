@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const pool = require('./db');
 
@@ -10,6 +11,46 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 3333;
+
+// ==========================================
+// --- MIDDLEWARE DE SEGURIDAD (JWT) ---
+// ==========================================
+const verificarJWT = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(403).json({ error: "Acceso denegado: No traes gafete." });
+  try {
+    const decodificado = jwt.verify(token, process.env.JWT_SECRET || 'secreto_temporal');
+    req.usuarioLogueado = decodificado;
+    next();
+  } catch (error) { return res.status(401).json({ error: "Gafete inválido o expirado." }); }
+};
+
+// ==========================================
+// --- LOGIN (PÚBLICO) ---
+// ==========================================
+app.post('/api/login', async (req, res) => {
+  const { usuario, contrasena } = req.body;
+  try {
+    const result = await pool.query('SELECT * FROM doctores WHERE usuario = $1 AND estado != $2', [usuario, 'Inactivo']);
+    if (result.rows.length === 0) return res.status(404).json({ error: "Usuario no encontrado." });
+    
+    const empleado = result.rows[0];
+    const valida = await bcrypt.compare(contrasena, empleado.contrasena);
+    if (!valida) return res.status(401).json({ error: "Contraseña incorrecta." });
+
+    const token = jwt.sign(
+      { id: empleado.id_doctor, nombre: empleado.nombre_doctor },
+      process.env.JWT_SECRET || 'secreto_temporal',
+      { expiresIn: '10h' }
+    );
+    res.json({ message: "Bienvenido", token, usuario: empleado.nombre_doctor });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+// 🚨 APLICAMOS SEGURIDAD A TODAS LAS RUTAS DESPUÉS DEL LOGIN
+app.use('/api', verificarJWT);
+
 
 async function enviarWhatsApp(telefono, nombrePlantilla, variables, idioma = "es_MX") {
   const WA_PHONE_ID = process.env.WA_PHONE_ID;
@@ -57,7 +98,7 @@ async function enviarWhatsApp(telefono, nombrePlantilla, variables, idioma = "es
 
 // --- Consultorios ---
 app.route('/api/consultorios')
-  .get(async (req, res) => {
+  .get(async (req, res) => {    //Obtener consultorios
     try {
       const result = await pool.query(`
         SELECT * FROM v_estado_consultorios 
@@ -69,41 +110,25 @@ app.route('/api/consultorios')
       res.status(500).json({ error: error.message });
     }
   })
-  .post(async (req, res) => {
+  .post(async (req, res) => {   //Añadir nuevo consultorio
     const { nombre_consultorio, piso, edificio, id_area } = req.body;
-    if (!nombre_consultorio) return res.status(400).json({ error: "El nombre del consultorio es obligatorio" });
-
     try {
-      const result = await pool.query(
-        `INSERT INTO consultorios (nombre_consultorio, piso, edificio, disponible, id_area) 
-         VALUES ($1, $2, $3, true, $4) RETURNING *`,
-        [nombre_consultorio, piso || null, edificio || 'Principal', id_area || null]
-      );
+      const result = await pool.query(`INSERT INTO consultorios (nombre_consultorio, piso, edificio, disponible, id_area) VALUES ($1, $2, $3, true, $4) RETURNING *`, [nombre_consultorio, piso, edificio, id_area]);
       res.status(201).json(result.rows[0]);
-    } catch (error) {
-      console.error("Error al crear consultorio:", error);
-      res.status(500).json({ error: error.message });
-    }
+    } catch (error) { res.status(500).json({ error: error.message }); }
   });
 
 app.get('/api/consultorios-disponibles', async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT * FROM v_consultorios_disponibles 
-      ORDER BY id_consultorio ASC
-    `);
+    const result = await pool.query(`SELECT * FROM v_consultorios_disponibles ORDER BY id_consultorio ASC`);
     res.json(result.rows);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Error al obtener consultorios disponibles' });
-  }
+  } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 app.route('/api/consultorios/:id')
   .put(async (req, res) => {
     const { id } = req.params;
     const { nombre_consultorio, piso, edificio, id_area } = req.body;
-
     try {
       const result = await pool.query(
         `UPDATE consultorios 
@@ -345,37 +370,43 @@ app.get('/api/personal/completo', async (req, res) => {
 
 
 // --- ADMINISTRATIVOS ---
-app.post('/api/administrativos', async (req, res) => {    //Crear administrativo
-  const { nombre } = req.body;
-  if (!nombre) return res.status(400).json({ error: "El nombre es obligatorio." });
+app.post('/api/administrativos', async (req, res) => {
+  const { nombre, puesto, usuario, contrasena } = req.body; 
+  
+  if (!nombre || !usuario || !contrasena) {
+    return res.status(400).json({ error: "Nombre, usuario y contraseña son obligatorios." });
+  }
 
   try {
-    const nuevoAdmin = await pool.query(
-      `INSERT INTO administrativos (nombre, puesto, nombre_apartamentos) 
-       VALUES ($1, 'Administrativo General', 'Recepción') RETURNING *`,
-      [nombre]
+    const hash = await bcrypt.hash(contrasena, 10);
+    // Asumimos que "puesto" y "nombre_apartamentos" serán lo mismo para simplificar
+    const result = await pool.query(
+      `INSERT INTO administrativos (nombre, puesto, nombre_apartamentos, usuario, contrasena) 
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [nombre, puesto || 'General', puesto || 'General', usuario, hash]
     );
-    res.status(201).json(nuevoAdmin.rows[0]);
+    res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error("Error en DB:", error);
+    console.error(error);
     res.status(500).json({ error: error.message });
   }
 });
 
 app.route('/api/administrativos/:id')
-  .put(async (req, res) => {    //Editar administrativo
+  .put(async (req, res) => {
     const { id } = req.params;
-    const { nombre, puesto } = req.body;
+    const { nombre, puesto, usuario } = req.body;
 
     try {
       const result = await pool.query(
-        `UPDATE administrativos SET nombre = $1, puesto = $2 WHERE id = $3 RETURNING *`,
-        [nombre, puesto || 'Administrativo General', id]
+        `UPDATE administrativos 
+         SET nombre = $1, puesto = $2, nombre_apartamentos = $3, usuario = $4 
+         WHERE id = $5 RETURNING *`,
+        [nombre, puesto || 'General', puesto || 'General', usuario, id]
       );
       if (result.rowCount === 0) return res.status(404).json({ error: 'Administrativo no encontrado' });
-      res.json({ message: "Administrativo actualizado correctamente" });
+      res.json({ message: "Administrativo actualizado" });
     } catch (error) {
-      console.error(error);
       res.status(500).json({ error: error.message });
     }
   })
@@ -394,21 +425,34 @@ app.route('/api/administrativos/:id')
     }
   });
 
-// --- ENFERMEROS ---
+// ==========================================
+//            --- ENFERMEROS ---
+// ==========================================
 app.post('/api/enfermeros', async (req, res) => {
-  const { nombre, telefono, correo, usuario, contrasena, rol } = req.body; 
-  if (!nombre || !contrasena) return res.status(400).json({ error: "Faltan datos obligatorios." });
+  const { nombre, apellido, tipo_auxiliar, area, turno, telefono, correo } = req.body;
+  
+  if (!nombre || !apellido || !tipo_auxiliar) {
+    return res.status(400).json({ error: "Faltan datos obligatorios (Nombre, Apellido, Tipo)." });
+  }
 
   try {
-    const contrasenaHasheada = await bcrypt.hash(contrasena, 10);
-    const nuevoEnf = await pool.query(
-      `INSERT INTO enfermeros (nombre_enfermero, telefono, correo, usuario, contrasena, estado, area) 
-       VALUES ($1, $2, $3, $4, $5, 'Activo', $6) RETURNING *`,
-      [nombre, telefono, correo, usuario, contrasenaHasheada, rol || 'Enfermería General']
+    const result = await pool.query(
+      `INSERT INTO auxiliares (nombre, apellido, tipo_auxiliar, area, turno, telefono, correo, estado) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'Activo') RETURNING *`,
+      [
+        nombre, 
+        apellido, 
+        tipo_auxiliar, 
+        area || tipo_auxiliar, // Si no viene área, usamos el tipo como área
+        turno || 'Matutino', 
+        telefono || null, 
+        correo || null
+      ]
     );
-    res.status(201).json(nuevoEnf.rows[0]);
+    res.status(201).json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error al crear auxiliar:", error);
+    res.status(500).json({ error: 'Error al crear auxiliar: ' + error.message });
   }
 });
 
@@ -416,33 +460,41 @@ app.route('/api/enfermeros/:id')
   .put(async (req, res) => {
     const { id } = req.params;
     const { nombre, telefono, correo, estado, area } = req.body;
+    
+    // Separamos nombre y apellido nuevamente
+    const partes = nombre.split(" ");
+    const nombreAux = partes[0];
+    const apellidoAux = partes.slice(1).join(" ") || "N/A";
 
     try {
       const result = await pool.query(
-        `UPDATE enfermeros 
-         SET nombre_enfermero = $1, telefono = $2, correo = $3, estado = $4, area = $5
-         WHERE id_enfermero = $6 RETURNING *`,
-        [nombre, telefono || null, correo || null, estado || 'Activo', area || 'Enfermería General', id]
+        `UPDATE auxiliares SET nombre = $1, apellido = $2, tipo_auxiliar = $3 
+         WHERE id_auxiliar = $4 RETURNING *`,
+        [nombreAux, apellidoAux, area || 'Enfermería', id]
       );
-      if (result.rowCount === 0) return res.status(404).json({ error: 'Enfermero no encontrado' });
-      res.json({ message: "Enfermero actualizado correctamente" });
+      if (result.rowCount === 0) return res.status(404).json({ error: 'Auxiliar no encontrado' });
+      res.json({ message: "Auxiliar actualizado correctamente" });
     } catch (error) {
-      console.error(error);
       res.status(500).json({ error: error.message });
     }
   })
   .delete(async (req, res) => {
     const { id } = req.params;
     try {
-      await pool.query("UPDATE enfermeros SET estado = 'Inactivo' WHERE id_enfermero = $1", [id]);
-      res.json({ message: "Enfermero dado de baja exitosamente" });
+      await pool.query("DELETE FROM auxiliares WHERE id_auxiliar = $1", [id]);
+      res.json({ message: "Auxiliar eliminado exitosamente" });
     } catch (error) {
-      console.error(error);
       res.status(500).json({ error: error.message });
     }
   });
 
-app.get('/api/doctores/estado', async (req, res) => {
+  /*
+  ============
+    Doctores
+  ============
+  */
+
+app.get('/api/doctores/estado', async (req, res) => { //Obtener doctores
   try {
     const result = await pool.query('SELECT * FROM v_estado_doctores');
     res.json(result.rows);
@@ -454,17 +506,30 @@ app.get('/api/doctores/estado', async (req, res) => {
 
 app.route('/api/doctores')
   .post(async (req, res) => {
-    const { nombre, cedula_profesional, telefono, correo, usuario, contrasena, consultorio, id_especialidad } = req.body;
+    const { nombre, cedula_profesional, telefono, id_especialidad, consultorio, usuario, contrasena, correo } = req.body;
+    
     if (!nombre || !contrasena) return res.status(400).json({ error: "El nombre es obligatorio." });
 
     try {
       const contrasenaHasheada = await bcrypt.hash(contrasena, 10);
+      
       const nuevoDoctor = await pool.query(
-        `INSERT INTO doctores (nombre_doctor, cedula_profesional, telefono, correo, usuario, contrasena, estado, consultorio, id_especialidad) 
-         VALUES ($1, $2, $3, $4, $5, $6, 'Disponible', $7, $8) RETURNING *`,
-        [nombre, cedula_profesional, telefono, correo, usuario, contrasenaHasheada, consultorio || null, id_especialidad || null]
+        `INSERT INTO doctores (
+           nombre_doctor, cedula_profesional, telefono, correo, usuario, contrasena, estado, consultorio, id_especialidad
+         ) VALUES ($1, $2, $3, $4, $5, $6, 'Activo', $7, $8)`,
+        [
+          nombre, 
+          cedula_profesional, 
+          telefono, 
+          correo, 
+          usuario, 
+          contrasenaHasheada, 
+          consultorio || null, 
+          id_especialidad || null
+        ]
       );
-      res.status(201).json(nuevoDoctor.rows[0]);
+      
+      res.status(201).json({ message: "Doctor registrado con éxito" });
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: error.message });
@@ -481,7 +546,7 @@ app.route('/api/doctores/:id')
         `UPDATE doctores 
          SET nombre_doctor = $1, cedula_profesional = $2, telefono = $3, correo = $4, consultorio = $5, estado = $6, id_especialidad = $7
          WHERE id_doctor = $8 RETURNING *`,
-        [nombre_doctor, cedula_profesional, telefono, correo, consultorio || null, estado || 'Disponible', id_especialidad || null, id]
+        [nombre_doctor, cedula_profesional, telefono, correo, consultorio || null, estado || 'Activo', id_especialidad || null, id]
       );
       if (result.rowCount === 0) return res.status(404).json({ error: "Doctor no encontrado." });
       res.json({ message: "Datos del doctor actualizados correctamente" });
@@ -500,6 +565,21 @@ app.route('/api/doctores/:id')
       res.status(500).json({ error: error.message });
     }
   });
+
+  app.put('/api/doctores/:id/reingresar', async (req, res) => { //Reingresar
+    const { id } = req.params;
+    try {
+      const result = await pool.query(
+        "UPDATE doctores SET estado = 'Activo' WHERE id_doctor = $1 RETURNING *", 
+        [id]
+      );
+      if (result.rowCount === 0) return res.status(404).json({ error: "Doctor no encontrado." });
+      res.json({ message: "Doctor reingresado al equipo médico." });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Fallo en el reingreso." });
+    }
+});
 
 
 // ==========================================

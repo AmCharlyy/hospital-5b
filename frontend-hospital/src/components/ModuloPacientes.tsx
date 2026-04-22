@@ -5,6 +5,7 @@ import { Boton } from "./comunes/Boton";
 import { Modal } from "./comunes/Modal";
 import { Input } from "./comunes/Input";
 import { MenuDropdown } from "./comunes/MenuDropdown";
+import { apiFetch } from "../api";
 
 export function ModuloPacientes() {
   const [pacientes, setPacientes] = useState<any[]>([]);
@@ -42,7 +43,7 @@ export function ModuloPacientes() {
 
   const fetchPacientes = async () => {
     try {
-      const res = await fetch("http://localhost:3333/api/pacientes/completo", {
+      const res = await apiFetch("http://localhost:3333/api/pacientes/completo", {
         headers: getHeaders()
       });
 
@@ -88,7 +89,7 @@ export function ModuloPacientes() {
     const nuevaContrasena = generarContrasena();
 
     try {
-      const respuesta = await fetch("http://localhost:3333/api/pacientes", {
+      const respuesta = await apiFetch("http://localhost:3333/api/pacientes", {
         method: "POST",
         headers: getHeaders(),
         body: JSON.stringify({
@@ -129,7 +130,7 @@ export function ModuloPacientes() {
     if (!pacienteAEditar) return;
 
     try {
-      const res = await fetch(`http://localhost:3333/api/pacientes/${pacienteAEditar.id_paciente}`, {
+      const res = await apiFetch(`http://localhost:3333/api/pacientes/${pacienteAEditar.id_paciente}`, {
         method: "PUT",
         headers: getHeaders(),
         body: JSON.stringify({
@@ -158,7 +159,7 @@ export function ModuloPacientes() {
   // --- 3. PUT: Cambiar Estado Lógico ---
   const cambiarEstadoPaciente = async (pacienteId: string, nuevoIdStatus: number) => {
     try {
-      const res = await fetch(`http://localhost:3333/api/pacientes/${pacienteId}/estado`, {
+      const res = await apiFetch(`http://localhost:3333/api/pacientes/${pacienteId}/estado`, {
         method: "PUT",
         headers: getHeaders(),
         body: JSON.stringify({ id_status: nuevoIdStatus })
@@ -172,7 +173,7 @@ export function ModuloPacientes() {
   // --- 4. PUT: Dar de Baja (endpoint dedicado) ---
   const handleDarDeBaja = async (paciente: any) => {
     try {
-      const res = await fetch(`http://localhost:3333/api/pacientes/${paciente.id_paciente}/baja`, {
+      const res = await apiFetch(`http://localhost:3333/api/pacientes/${paciente.id_paciente}/baja`, {
         method: "PUT",
         headers: getHeaders()
       });
@@ -193,7 +194,7 @@ export function ModuloPacientes() {
   const handleNuevaContrasena = async (paciente: any) => {
     const nuevaContrasena = generarContrasena();
     try {
-      const res = await fetch(`http://localhost:3333/api/pacientes/${paciente.id_paciente}/password`, {
+      const res = await apiFetch(`http://localhost:3333/api/pacientes/${paciente.id_paciente}/password`, {
         method: "PUT",
         headers: getHeaders(),
         body: JSON.stringify({ contrasena_plana: nuevaContrasena })

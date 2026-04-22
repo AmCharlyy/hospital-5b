@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { apiFetch } from "../api";
 
 export interface Paciente { id: string; nombre: string; curp: string; telefono: string; estado: "Activo" | "Inactivo"; fechaRegistro: string; }
 export interface Empleado { id: string; nombre: string; rol: string; estado: string; tipo: string; avatar: string; }
@@ -38,9 +39,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [citas, setCitas] = useState<Cita[]>([]);
   const [auxiliares, setAuxiliares] = useState<Auxiliar[]>([]);
 
+  const getHeaders = () => ({
+  'Content-Type': 'application/json',
+  'Authorization': `Bearer ${localStorage.getItem('hospital_token') || ''}`
+});
+
   const fetchAuxiliares = async () => {
     try {
-      const res = await fetch('http://localhost:3333/api/auxiliares');
+      const res = await apiFetch('http://localhost:3333/api/auxiliares');
       if (!res.ok) throw new Error('Error al obtener auxiliares');
       const data: Auxiliar[] = await res.json();
       setAuxiliares(data);
@@ -51,7 +57,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addAuxiliar = async (auxiliar: Omit<Auxiliar, 'id_auxiliar'>) => {
     try {
-      const res = await fetch('http://localhost:3333/api/auxiliares', {
+      const res = await apiFetch('http://localhost:3333/api/auxiliares', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(auxiliar),
@@ -67,7 +73,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updateAuxiliar = async (id: number, auxiliar: Partial<Auxiliar>) => {
     try {
-      const res = await fetch(`http://localhost:3333/api/auxiliares/${id}`, {
+      const res = await apiFetch(`http://localhost:3333/api/auxiliares/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(auxiliar),
@@ -83,7 +89,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const deleteAuxiliar = async (id: number) => {
     try {
-      const res = await fetch(`http://localhost:3333/api/auxiliares/${id}`, {
+      const res = await apiFetch(`http://localhost:3333/api/auxiliares/${id}`, {
         method: 'DELETE',
       });
       if (!res.ok) throw await res.json();

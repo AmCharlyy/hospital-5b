@@ -1,9 +1,4 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion"; 
 import { BarraLateral } from "./components/BarraLateral";
 import { DirectorioPersonal } from "./components/DirectorioPersonal";
@@ -12,22 +7,41 @@ import { ModuloAgenda } from "./components/ModuloAgenda";
 import { ModuloPacientes } from "./components/ModuloPacientes";
 import { PanelAuxiliares } from "./components/PanelAuxiliares";
 import { AppProvider } from "./context/AppContext";
+import { Login } from "./components/Login"; // 🚨 Asegúrate de que esta ruta sea la correcta
+import { Activity } from "lucide-react";
 
 export default function App() {
-  // 1. Inicia directamente en "pacientes"
+  const [autenticado, setAutenticado] = useState(false);
   const [pestanaActiva, setPestanaActiva] = useState("pacientes"); 
-  
-  // 2. Estado para controlar la pantalla de carga
   const [cargando, setCargando] = useState(true);
 
-  // 3. Simulamos el tiempo de carga inicial (1.5 segundos)
+  // 1. Verificar si hay un gafete (Token) guardado al cargar
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setCargando(false);
-    }, 1500);
-    return () => clearTimeout(timer);
+    const token = localStorage.getItem('hospital_token');
+    if (token) {
+      setAutenticado(true);
+      setCargando(true); // Iniciamos pantalla de carga
+    } else {
+      setCargando(false); // No hay sesión, mostramos Login directo
+    }
   }, []);
 
+  // 2. Control del Spinner de carga
+  useEffect(() => {
+    if (autenticado) {
+      const timer = setTimeout(() => {
+        setCargando(false);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [autenticado]);
+
+  // 3. Si NO está autenticado, mostramos la pantalla de Login
+  if (!autenticado) {
+    return <Login onLoginExitoso={() => setAutenticado(true)} />;
+  }
+
+  // 4. Si ESTÁ autenticado, mostramos la App
   return (
     <AppProvider>
       <AnimatePresence mode="wait">
@@ -39,13 +53,11 @@ export default function App() {
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#f5f5f7]"
           >
-            {/* Spinner giratorio */}
             <motion.div
               animate={{ rotate: 360 }}
               transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
               className="w-10 h-10 border-[3px] border-black/[0.05] border-t-blue-600 rounded-full mb-6"
             />
-            {/* Texto elegante */}
             <motion.p 
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
@@ -56,7 +68,6 @@ export default function App() {
             </motion.p>
           </motion.div>
         ) : (
-          // --- SISTEMA PRINCIPAL ---
           <motion.div 
             key="app-principal"
             initial={{ opacity: 0 }}
@@ -66,7 +77,7 @@ export default function App() {
           >
             <BarraLateral pestanaActiva={pestanaActiva} setPestanaActiva={setPestanaActiva} />
             
-            <main className="flex-1 ml-64 p-8 lg:p-12 overflow-visible">
+            <main className="flex-1 ml-64 p-8 lg:p-12 overflow-y-auto">
               <div className="max-w-7xl mx-auto">
                 <AnimatePresence mode="wait">
                   {pestanaActiva === "pacientes" && <ModuloPacientes key="pacientes" />}
