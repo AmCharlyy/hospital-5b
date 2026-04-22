@@ -34,9 +34,11 @@ export function TarjetaEmpleado({ empleado, onClick, opciones }: Props) {
       <div className="flex flex-col items-end gap-2">
         {opciones && <MenuDropdown opciones={opciones} />}
         <span className={`text-[11px] font-semibold uppercase tracking-wider px-2 py-1 rounded-md ${
-          empleado.estado === 'En Turno' ? 'bg-green-100 text-green-700' :
-          empleado.estado === 'En Consulta' ? 'bg-blue-100 text-blue-700' :
-          empleado.estado === 'En Ruta' ? 'bg-orange-100 text-orange-700' :
+          empleado.estado === 'Activo' ? 'bg-brand-green/10 text-brand-green-dark' :
+          empleado.estado === 'Inactivo' ? 'bg-gray-200 text-gray-600' :
+          empleado.estado === 'Descanso' ? 'bg-blue-200 text-blue-700' :
+          empleado.estado === 'En Consulta' ? 'bg-red-200 text-red-700' :
+          empleado.estado === 'Ausente' ? 'bg-orange-100 text-orange-700' :
           'bg-gray-100 text-gray-600'
         }`}>
           {empleado.estado}
