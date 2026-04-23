@@ -54,11 +54,16 @@ export function Login({ onLoginExitoso }: LoginProps) {
         className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-black/[0.05] p-8"
       >
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+          <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+            <img
+            src="https://i.postimg.cc/13NcVHWy/LOGO.png"
+            alt="CHEPA'S Hospital Logo"
+            className="w-full h-full object-contain p-1"
+          />
             <Activity className="w-8 h-8 text-white" />
           </div>
           <h2 className="text-2xl font-bold text-[#1d1d1f]">CHEPA'S Hospital</h2>
-          <p className="text-sm text-[#86868b] mt-1">Portal de Gestión Interna</p>
+          <p className="text-sm text-[#86868b] mt-1">Portal de administración</p>
         </div>
 
         {error && (

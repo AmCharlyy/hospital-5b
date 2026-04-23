@@ -524,7 +524,7 @@ export function ModuloPacientes() {
                       setPacienteSeleccionado(null); // Cerramos este modal
                       setPacienteAEditar(pacienteSeleccionado); // Abrimos el modal de edición
                     }}
-                    className="w-full bg-blue-600 text-white hover:bg-blue-800 border-none shadow-none"
+                    className="w-full bg-indigo-hospital text-white hover:bg-aqua-hospital border-none shadow-none"
                   >
                     Editar Datos
                   </Boton>
@@ -563,7 +563,7 @@ export function ModuloPacientes() {
                       setConfirmandoBaja(pacienteSeleccionado);
                       setPacienteSeleccionado(null);
                     }}
-                    className="w-full bg-red-700 hover:bg-red-500 border-none shadow-none"
+                    className="w-full bg-red-500 hover:bg-red-400 border-none shadow-none"
                   >
                     Dar de Baja (Retirar del Sistema)
                   </Boton>
