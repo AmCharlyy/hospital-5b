@@ -52,14 +52,23 @@ export function Infraestructura() {
     try {
       const res = await apiFetch("http://localhost:3333/api/consultorios");
       const data = await res.json();
-      const consultoriosFormateados = data.map((c: any) => ({
-        id_consultorio: c.id_consultorio, // Corregido: tu BD devuelve id_consultorio, no id_ui
-        nombre_consultorio: c.nombre_consultorio || c.nombre,
-        estado: c.disponible ? "disponible" : "ocupado",
-        piso: c.piso || 1,
-        edificio: c.edificio || "Principal",
-        id_area: c.id_area || 1
-      }));
+
+      const consultoriosFormateados = data.map((c: any) => {
+        // Detectamos si el backend le puso la etiqueta de baja
+        const nombreReal = c.nombre_consultorio || c.nombre;
+        const esBaja = nombreReal.startsWith("[BAJA] ");
+
+        return {
+          id_consultorio: c.id_consultorio,
+          // Le quitamos el "[BAJA] " visualmente para que se vea limpio
+          nombre_consultorio: esBaja ? nombreReal.replace("[BAJA] ", "") : nombreReal,
+          // Si tiene la etiqueta, su estado es 'inactivo'. Si no, depende de 'disponible'
+          estado: esBaja ? "inactivo" : (c.disponible ? "disponible" : "ocupado"),
+          piso: c.piso || 1,
+          edificio: c.edificio || "Principal",
+          id_area: c.id_area || 1
+        };
+      });
       setConsultorios(consultoriosFormateados);
     } catch (error) { console.error("Error al cargar consultorios:", error); }
   };
@@ -84,7 +93,8 @@ export function Infraestructura() {
         tipo: h.tipo_habitacion || "Habitación",
         estado: (h.estado || "disponible").toLowerCase(), // 'Disponible' pasa a 'disponible'
         pacienteId: h.id_paciente || null,
-        tiempo: null // Esto se puede calcular después si la BD te da la fecha de ingreso
+        tiempo: null, // Esto se puede calcular después si la BD te da la fecha de ingreso
+        piso: h.piso // Añadir el piso aquí
       }));
 
       setHabitacionesBD(habitacionesFormateadas);
@@ -175,6 +185,19 @@ export function Infraestructura() {
     } catch (error) { console.error("Error:", error); }
   };
 
+  const reingresarConsultorio = async (id: number) => {
+    try {
+      // Al reingresar, simplemente le quitamos el [BAJA] y lo ponemos disponible
+      await apiFetch(`http://localhost:3333/api/consultorios/${id}/reingresar`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" }
+      });
+
+      setConsultorioSeleccionado(null);
+      fetchConsultorios(); // Recargar la lista
+    } catch (error) { console.error("Error al reingresar:", error); }
+  };
+
 
   /*==============
       HABITACIONES
@@ -249,13 +272,13 @@ export function Infraestructura() {
 
   //Eliminar habitaciones
   const handleEliminarHabitacion = async (idVisual: string) => {
-    if(!confirm("¿Seguro que deseas eliminar esta habitación?")) return;
+    if (!confirm("¿Seguro que deseas eliminar esta habitación?")) return;
     const habitacionReal = habitacionesBD.find(h => h.id === idVisual);
     if (!habitacionReal) return;
 
     try {
       const res = await apiFetch(`http://localhost:3333/api/habitaciones/${habitacionReal.id_bd}`, { method: "DELETE" });
-      if(res.ok){
+      if (res.ok) {
         setHabitacionSeleccionada(null);
         fetchHabitaciones();
       } else {
@@ -274,20 +297,22 @@ export function Infraestructura() {
 
   const consultoriosFiltrados = useMemo(() => {
     return consultorios.filter(c =>
-      c.nombre_consultorio.toLowerCase().includes(busqueda.toLowerCase()) ||
-      c.edificio.toLowerCase().includes(busqueda.toLowerCase()) ||
-      c.id_consultorio.toString().includes(busqueda)
+      c.edificio !== 'INACTIVO' &&
+      (
+        c.nombre_consultorio.toLowerCase().includes(busqueda.toLowerCase()) ||
+        c.edificio.toLowerCase().includes(busqueda.toLowerCase()) ||
+        c.id_consultorio.toString().includes(busqueda)
+      )
     );
   }, [consultorios, busqueda]);
 
   const statsHabitaciones = useMemo(() => {
-    return consultorios.filter(c =>
-      c.nombre_consultorio.toLowerCase().includes(busqueda.toLowerCase()) ||
-      c.edificio.toLowerCase().includes(busqueda.toLowerCase()) ||
-      c.id_consultorio.toString().includes(busqueda)
-    );
-  }, [consultorios, busqueda]);
-
+    const total = habitacionesBD.length;
+    const disponibles = habitacionesBD.filter(h => h.estado === 'disponible').length;
+    const ocupadas = habitacionesBD.filter(h => h.estado === 'ocupada').length;
+    const mantenimiento = habitacionesBD.filter(h => h.estado === 'mantenimiento' || h.estado === 'limpieza').length;
+    return { total, disponibles, ocupadas, mantenimiento };
+  }, [habitacionesBD]);
   const statsConsultorios = {
     total: consultorios.length,
     disponibles: consultorios.filter(c => c.estado === 'disponible').length,
@@ -569,6 +594,12 @@ export function Infraestructura() {
                   value={habitacionEditada.id || ""}
                   onChange={(e) => setHabitacionEditada({ ...habitacionEditada, id: e.target.value })}
                 />
+                <Input
+                  label="Piso"
+                  type="number"
+                  value={habitacionEditada.piso?.toString() || ""}
+                  onChange={(e) => setHabitacionEditada({ ...habitacionEditada, piso: Number(e.target.value) })}
+                />
                 <Select
                   label="Tipo de Espacio"
                   value={habitacionEditada.tipo || ""}
@@ -686,34 +717,42 @@ export function Infraestructura() {
                 </div>
 
                 <div className="flex flex-col gap-3 pt-4 border-t border-black/[0.05]">
-                  <div className="grid grid-cols-2 gap-3">
-                    {consultorioSeleccionado.estado !== 'disponible' && (
-                      <Boton className="w-full" onClick={() => actualizarEstadoConsultorio(consultorioSeleccionado.id_consultorio, 'disponible')}>
-                        Marcar Disponible
+                  {consultorioSeleccionado.estado === 'inactivo' ? (
+                    <Boton className="w-full bg-green-600 hover:bg-green-700" onClick={() => reingresarConsultorio(consultorioSeleccionado.id_consultorio)}>
+                      Reingresar Consultorio
+                    </Boton>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        {consultorioSeleccionado.estado !== 'disponible' && (
+                          <Boton className="w-full" onClick={() => actualizarEstadoConsultorio(consultorioSeleccionado.id_consultorio, 'disponible')}>
+                            Marcar Disponible
+                          </Boton>
+                        )}
+                        {consultorioSeleccionado.estado !== 'ocupado' && consultorioSeleccionado.estado !== 'ocupada' && (
+                          <Boton className="w-full" onClick={() => actualizarEstadoConsultorio(consultorioSeleccionado.id_consultorio, 'ocupado')}>
+                            Marcar Ocupado
+                          </Boton>
+                        )}
+                        {consultorioSeleccionado.estado !== 'mantenimiento' && (
+                          <Boton className="w-full" variante="secundario" onClick={() => actualizarEstadoConsultorio(consultorioSeleccionado.id_consultorio, 'mantenimiento')}>
+                            Mantenimiento
+                          </Boton>
+                        )}
+                        {consultorioSeleccionado.estado !== 'limpieza' && (
+                          <Boton className="w-full" variante="secundario" onClick={() => actualizarEstadoConsultorio(consultorioSeleccionado.id_consultorio, 'limpieza')}>
+                            Limpieza
+                          </Boton>
+                        )}
+                      </div>
+                      <Boton className="w-full" variante="secundario" onClick={iniciarEdicionConsultorio}>
+                        <Edit2 className="w-4 h-4 mr-2" />
+                        Editar Detalles
                       </Boton>
-                    )}
-                    {consultorioSeleccionado.estado !== 'ocupado' && consultorioSeleccionado.estado !== 'ocupada' && (
-                      <Boton className="w-full" onClick={() => actualizarEstadoConsultorio(consultorioSeleccionado.id_consultorio, 'ocupado')}>
-                        Marcar Ocupado
-                      </Boton>
-                    )}
-                    {consultorioSeleccionado.estado !== 'mantenimiento' && (
-                      <Boton className="w-full" variante="secundario" onClick={() => actualizarEstadoConsultorio(consultorioSeleccionado.id_consultorio, 'mantenimiento')}>
-                        Mantenimiento
-                      </Boton>
-                    )}
-                    {consultorioSeleccionado.estado !== 'limpieza' && (
-                      <Boton className="w-full" variante="secundario" onClick={() => actualizarEstadoConsultorio(consultorioSeleccionado.id_consultorio, 'limpieza')}>
-                        Limpieza
-                      </Boton>
-                    )}
-                  </div>
-                  <Boton className="w-full" variante="secundario" onClick={iniciarEdicionConsultorio}>
-                    <Edit2 className="w-4 h-4 mr-2" />
-                    Editar Detalles
-                  </Boton>
-                  <Boton variante="secundario" onClick={() => setConsultorioSeleccionado(null)}>Cerrar</Boton>
-                  <Boton variante="peligro" onClick={() => handleEliminarConsultorio(consultorioSeleccionado.id_consultorio)}>Eliminar Consultorio</Boton>
+                      <Boton variante="secundario" onClick={() => setConsultorioSeleccionado(null)}>Cerrar</Boton>
+                      <Boton variante="peligro" onClick={() => handleEliminarConsultorio(consultorioSeleccionado.id_consultorio)}>Eliminar Consultorio</Boton>
+                    </>
+                  )}
                 </div>
               </>
             ) : (

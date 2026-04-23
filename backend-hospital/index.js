@@ -163,11 +163,22 @@ app.route('/api/consultorios/:id')
   .delete(async (req, res) => {
     const { id } = req.params;
     try {
-      await pool.query(`DELETE FROM consultorios WHERE id_consultorio = $1`, [id]);
-      res.json({ message: "Consultorio eliminado exitosamente" });
+      // Truco: No borramos, solo le pegamos [BAJA] al nombre y lo ponemos en false
+      await pool.query(
+        `UPDATE consultorios 
+         SET disponible = false, 
+             nombre_consultorio = CASE 
+               WHEN nombre_consultorio NOT LIKE '[BAJA] %' THEN '[BAJA] ' || nombre_consultorio 
+               ELSE nombre_consultorio 
+             END
+         WHERE id_consultorio = $1`, 
+        [id]
+      );
+      
+      res.json({ message: "Consultorio dado de baja exitosamente" });
     } catch (error) {
-      console.error("Error al eliminar consultorio:", error);
-      res.status(500).json({ error: "No se puede eliminar porque tiene citas o datos enlazados." });
+      console.error("Error al dar de baja el consultorio:", error);
+      res.status(500).json({ error: "Ocurrió un error al intentar dar de baja en la BD." });
     }
   });
 
@@ -180,6 +191,22 @@ app.put('/api/consultorios/:id/estado', async (req, res) => {
     res.json({ message: "Disponibilidad actualizada" });
   } catch (error) {
     console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+//Reingresar
+app.put('/api/consultorios/:id/reingresar', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query(
+      `UPDATE consultorios 
+       SET disponible = true, 
+           nombre_consultorio = REPLACE(nombre_consultorio, '[BAJA] ', '') 
+       WHERE id_consultorio = $1`, 
+      [id]
+    );
+    res.json({ message: "Consultorio reingresado" });
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
