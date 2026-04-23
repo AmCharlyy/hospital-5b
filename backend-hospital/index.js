@@ -9,7 +9,10 @@ const app = express();
 
 app.disable('x-powered-by');
 
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+}));
+
 app.use(express.json());
 
 const PORT = process.env.PORT || 3333;
@@ -53,7 +56,7 @@ app.post('/api/login', async (req, res) => {
 
     const token = jwt.sign(
       { id: admin.id, nombre: admin.nombre, puesto: admin.puesto, rol: 'administrativo' },
-      process.env.JWT_SECRET || 'secreto_temporal',
+      process.env.JWT_SECRET || 'secreto_temporal',   //Usar una contraseña más fuerte(/_1.@)
       { expiresIn: '10h' }
     );
     res.json({ message: "Bienvenido", token, usuario: admin.nombre, puesto: admin.puesto });
@@ -63,7 +66,6 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// 🚨 APLICAMOS SEGURIDAD A TODAS LAS RUTAS DESPUÉS DEL LOGIN
 app.use('/api', verificarJWT);
 
 
