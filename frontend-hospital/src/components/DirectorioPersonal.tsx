@@ -213,6 +213,7 @@ export function DirectorioPersonal() {
     if (empleadoAEditar.tipo === 'doctor') {
       body.nombre_doctor = empleadoAEditar.nombre;
       body.id_especialidad = empleadoAEditar.id_especialidad;
+      body.cedula_profesional = empleadoAEditar.cedula_profesional;
       body.consultorio = empleadoAEditar.consultorio;
     } else if (empleadoAEditar.tipo === 'enfermero') {
       body.area = empleadoAEditar.rol;
@@ -568,17 +569,21 @@ export function DirectorioPersonal() {
                 onChange={(e) => setEmpleadoAEditar({ ...empleadoAEditar, usuario: e.target.value })}
               />
             )}
-
-            <Select
-              label="Estado Operativo"
-              value={empleadoAEditar.estado || "Disponible"}
-              onChange={(e) => setEmpleadoAEditar({ ...empleadoAEditar, estado: e.target.value })}
-            >
-              <option value="Activo">Activo</option>
-              <option value="En Consulta">En Consulta</option>
-              <option value="Descanso">Descanso</option>
-              <option value="Ausente">Ausente</option>
-            </Select>
+            
+              {/* ESTADO OPERATIVO (Solo para Doctores y Enfermeros) */}
+            {(empleadoAEditar.tipo === "doctor" || empleadoAEditar.tipo === "enfermero") && (
+              <Select
+                label="Estado Operativo"
+                value={empleadoAEditar.estado || "Activo"}
+                onChange={(e) => setEmpleadoAEditar({ ...empleadoAEditar, estado: e.target.value })}
+              >
+                <option value="Activo">Activo</option>
+                <option value="Disponible">Disponible</option>
+                {empleadoAEditar.tipo === "doctor" && <option value="En Consulta">En Consulta</option>}
+                <option value="Descanso">Descanso</option>
+                <option value="Ausente">Ausente</option>
+              </Select>
+            )}
 
             <div className="pt-4 flex justify-end gap-3">
               <Boton type="button" variante="secundario" onClick={() => setEmpleadoAEditar(null)}>Cancelar</Boton>
@@ -614,6 +619,7 @@ export function DirectorioPersonal() {
               {([
                 ["Tipo de Personal", <span className="capitalize">{empleadoSeleccionado.tipo}</span>],
                 ["ID del Sistema", empleadoSeleccionado.id],
+                ...(empleadoSeleccionado.usuario ? [["Usuario", empleadoSeleccionado.usuario]] : []),
                 ...(empleadoSeleccionado.cedula_profesional ? [["Cédula Profesional", empleadoSeleccionado.cedula_profesional]] : []),
                 ...(empleadoSeleccionado.telefono ? [["Teléfono", empleadoSeleccionado.telefono]] : []),
                 ...(empleadoSeleccionado.correo ? [["Correo", empleadoSeleccionado.correo]] : []),

@@ -598,10 +598,10 @@ app.route('/api/pacientes')
 
     try {
       const estadoRes = await pool.query(
-        `SELECT id_estado FROM status WHERE nombre_estado ILIKE 'Registrado' LIMIT 1`
+        `SELECT id_status FROM status WHERE status ILIKE 'EN ESPERA' LIMIT 1`
       );
       if (estadoRes.rows.length === 0) {
-        return res.status(500).json({ error: "No existe el estado 'EN ESPERA' en status." });
+        return res.status(500).json({ error: "No existe ese estado en status." });
       }
       const idEnEspera = estadoRes.rows[0].id_estado;
 
