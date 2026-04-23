@@ -396,7 +396,7 @@ export function DirectorioPersonal() {
           </Select>
 
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-[#1d1d1f]">
+            <label className="text-sm font-medium text-[#071952]">
               {nuevoEmpleado.tipo === "doctor" ? "Especialidad Médica" :
                 nuevoEmpleado.tipo === "enfermero" ? "Área de Enfermería" : "Puesto Administrativo"}
             </label>

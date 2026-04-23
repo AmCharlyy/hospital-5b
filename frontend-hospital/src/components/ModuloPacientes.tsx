@@ -435,8 +435,8 @@ export function ModuloPacientes() {
             <Boton type="submit">Registrar y Generar Acceso</Boton>
           </div>
         </form>
-      </Modal>
 
+      </Modal>
       {/* ── MODAL: Credenciales ── */}
       <Modal isOpen={modalCredenciales} onClose={() => setModalCredenciales(false)} titulo="Acceso Generado Exitosamente">
         <div className="space-y-6 text-center">

@@ -109,7 +109,7 @@ export function PanelAuxiliares() {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {stats.map((stat, i) => (
-          <div key={i} className="bg-white p-5 rounded-2xl border border-black/[0.05] shadow-sm">
+          <div key={i} className="bg-white p-5 rounded-2xl border border-black/[0.05] shadow-sm hover:shadow-lg transition-shadow duration-300">
             <p className="text-sm font-medium text-[#86868b] mb-1">{stat.label}</p>
             <p className="text-3xl font-bold text-[#1d1d1f]">{stat.value}</p>
           </div>
