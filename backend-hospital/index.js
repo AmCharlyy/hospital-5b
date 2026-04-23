@@ -189,10 +189,7 @@ app.put('/api/consultorios/:id/estado', async (req, res) => {
 app.route('/api/habitaciones')
   .get(async (req, res) => {
     try {
-      const result = await pool.query(`
-        SELECT * FROM v_habitaciones_disponibles 
-        ORDER BY piso ASC, numero_habitacion ASC
-      `);
+      const result = await pool.query(`SELECT * FROM v_todas_habitaciones`);
       res.json(result.rows);
     } catch (error) {
       console.error("Error al obtener habitaciones:", error);
@@ -200,16 +197,16 @@ app.route('/api/habitaciones')
     }
   })
   .post(async (req, res) => {
-    const { numero_habitacion, piso, tipo_habitacion, costo_dia } = req.body;
+    const { numero_habitacion, piso, tipo_habitacion} = req.body;
     if (!numero_habitacion || !piso || !tipo_habitacion) {
       return res.status(400).json({ error: "Faltan datos obligatorios de la habitación." });
     }
 
     try {
       const result = await pool.query(
-        `INSERT INTO habitaciones (numero_habitacion, piso, tipo_habitacion, estado, costo_dia) 
-         VALUES ($1, $2, $3, 'Disponible', $4) RETURNING *`,
-        [numero_habitacion, piso, tipo_habitacion, costo_dia || 0]
+        `INSERT INTO habitaciones (numero_habitacion, piso, tipo_habitacion) 
+         VALUES ($1, $2, $3) RETURNING *`,
+        [numero_habitacion, piso, tipo_habitacion]
       );
       res.status(201).json(result.rows[0]);
     } catch (error) {
@@ -235,14 +232,14 @@ app.get('/api/habitaciones-disponibles', async (req, res) => {
 app.route('/api/habitaciones/:id')
   .put(async (req, res) => {
     const { id } = req.params;
-    const { numero_habitacion, piso, tipo_habitacion, costo_dia } = req.body;
+    const { numero_habitacion, piso, tipo_habitacion} = req.body;
 
     try {
       const result = await pool.query(
         `UPDATE habitaciones 
-         SET numero_habitacion = $1, piso = $2, tipo_habitacion = $3, costo_dia = $4 
-         WHERE id_habitacion = $5 RETURNING *`,
-        [numero_habitacion, piso, tipo_habitacion, costo_dia, id]
+         SET numero_habitacion = $1, piso = $2, tipo_habitacion = $3 
+         WHERE id_habitacion = $4 RETURNING *`,
+        [numero_habitacion, piso, tipo_habitacion, id]
       );
       if (result.rowCount === 0) return res.status(404).json({ error: 'Habitación no encontrada' });
       res.json(result.rows[0]);
@@ -371,8 +368,8 @@ app.get('/api/personal/completo', async (req, res) => {
 
 // --- ADMINISTRATIVOS ---
 app.post('/api/administrativos', async (req, res) => {    //Obtener
-  const { nombre, puesto, usuario, contrasena } = req.body; 
-  
+  const { nombre, puesto, usuario, contrasena } = req.body;
+
   if (!nombre || !usuario || !contrasena) {
     return res.status(400).json({ error: "Nombre, usuario y contraseña son obligatorios." });
   }
@@ -452,9 +449,9 @@ app.route('/api/enfermeros/:id')
   .put(async (req, res) => {
     const { id } = req.params;
     const { nombre, telefono, correo, estado, area } = req.body;
-    
+
     // Separamos nombre y apellido nuevamente
-    const partes =(nombre || "").trim().split(" ");
+    const partes = (nombre || "").trim().split(" ");
     const nombreAux = partes[0];
     const apellidoAux = partes.slice(1).join(" ") || "N/A";
 
@@ -463,7 +460,7 @@ app.route('/api/enfermeros/:id')
         `UPDATE auxiliares 
          SET nombre = $1, apellido = $2, area = $3, telefono = $4, correo = $5, estado = $6 
          WHERE id_auxiliar = $7 RETURNING *`,
-        [nombreAux, apellidoAux, area, telefono, correo, estado || 'Activo',id]
+        [nombreAux, apellidoAux, area, telefono, correo, estado || 'Activo', id]
       );
       if (result.rowCount === 0) return res.status(404).json({ error: 'Auxiliar no encontrado' });
       res.json({ message: "Auxiliar actualizado correctamente" });
@@ -481,11 +478,11 @@ app.route('/api/enfermeros/:id')
     }
   });
 
-  /*
-  ============
-    Doctores
-  ============
-  */
+/*
+============
+  Doctores
+============
+*/
 
 app.get('/api/doctores/estado', async (req, res) => { //Obtener doctores
   try {
@@ -500,28 +497,28 @@ app.get('/api/doctores/estado', async (req, res) => { //Obtener doctores
 app.route('/api/doctores')
   .post(async (req, res) => {
     const { nombre, cedula_profesional, telefono, id_especialidad, consultorio, usuario, contrasena, correo } = req.body;
-    
+
     if (!nombre || !contrasena) return res.status(400).json({ error: "El nombre es obligatorio." });
 
     try {
       const contrasenaHasheada = await bcrypt.hash(contrasena, 10);
-      
+
       const nuevoDoctor = await pool.query(
         `INSERT INTO doctores (
            nombre_doctor, cedula_profesional, telefono, correo, usuario, contrasena, estado, consultorio, id_especialidad
          ) VALUES ($1, $2, $3, $4, $5, $6, 'Activo', $7, $8)`,
         [
-          nombre, 
-          cedula_profesional, 
-          telefono, 
-          correo, 
-          usuario, 
-          contrasenaHasheada, 
-          consultorio || null, 
+          nombre,
+          cedula_profesional,
+          telefono,
+          correo,
+          usuario,
+          contrasenaHasheada,
+          consultorio || null,
           id_especialidad || null
         ]
       );
-      
+
       res.status(201).json({ message: "Doctor registrado con éxito" });
     } catch (error) {
       console.error(error);
@@ -559,19 +556,19 @@ app.route('/api/doctores/:id')
     }
   });
 
-  app.put('/api/doctores/:id/reingresar', async (req, res) => { //Reingresar
-    const { id } = req.params;
-    try {
-      const result = await pool.query(
-        "UPDATE doctores SET estado = 'Activo' WHERE id_doctor = $1 RETURNING *", 
-        [id]
-      );
-      if (result.rowCount === 0) return res.status(404).json({ error: "Doctor no encontrado." });
-      res.json({ message: "Doctor reingresado al equipo médico." });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Fallo en el reingreso." });
-    }
+app.put('/api/doctores/:id/reingresar', async (req, res) => { //Reingresar
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      "UPDATE doctores SET estado = 'Activo' WHERE id_doctor = $1 RETURNING *",
+      [id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: "Doctor no encontrado." });
+    res.json({ message: "Doctor reingresado al equipo médico." });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Fallo en el reingreso." });
+  }
 });
 
 

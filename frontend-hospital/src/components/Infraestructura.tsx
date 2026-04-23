@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Plus, Building2, Bed, Search, Edit2, Save, X } from "lucide-react";
-import { TarjetaHabitacion } from "./comunes/TarjetaHabitacion";
-import { TarjetaConsultorio } from "./comunes/TarjetaConsultorio";
 import { Modal } from "./comunes/Modal";
 import { Boton } from "./comunes/Boton";
 import { Select } from "./comunes/Select";
 import { Input } from "./comunes/Input";
+import { TarjetaConsultorio } from "./comunes/TarjetaConsultorio";
+import { TarjetaHabitacion } from "./comunes/TarjetaHabitacion";
 import { useAppStore, Habitacion } from "../context/AppContext";
 import { apiFetch } from "../api";
 
@@ -24,7 +24,8 @@ const AREAS_MAP: Record<number, string> = {
 export function Infraestructura() {
   // Las habitaciones y pacientes los seguimos sacando del store global por ahora
   const { habitaciones, addHabitacion, updateHabitacion, deleteHabitacion, pacientes } = useAppStore();
-  
+  const [pacientesBD, setPacientesBD] = useState<any[]>([]);
+  const [habitacionesBD, setHabitacionesBD] = useState<any[]>([]);
   // Estado para los Consultorios (Conectado a la API)
   const [consultorios, setConsultorios] = useState<any[]>([]);
 
@@ -35,7 +36,7 @@ export function Infraestructura() {
   const [habitacionSeleccionada, setHabitacionSeleccionada] = useState<Habitacion | null>(null);
   const [pacienteAAsignar, setPacienteAAsignar] = useState<number | "">("");
   const [modalNuevaHabitacion, setModalNuevaHabitacion] = useState(false);
-  const [nuevaHabitacion, setNuevaHabitacion] = useState({ id: "", tipo: "Habitación" });
+  const [nuevaHabitacion, setNuevaHabitacion] = useState({ id: "", tipo: "Habitación", piso: "" });
   const [modoEdicionHabitacion, setModoEdicionHabitacion] = useState(false);
   const [habitacionEditada, setHabitacionEditada] = useState<Partial<Habitacion>>({});
 
@@ -51,102 +52,101 @@ export function Infraestructura() {
     try {
       const res = await apiFetch("http://localhost:3333/api/consultorios");
       const data = await res.json();
-      
-      // Mapeamos los datos de la BD para que coincidan con la UI que diseñaste
       const consultoriosFormateados = data.map((c: any) => ({
-        id_consultorio: c.id_ui,
-        nombre_consultorio: c.nombre,
-        estado: c.estado,
-        piso: 1, // Simulamos un piso predeterminado ya que la BD no lo tiene aún
-        edificio: "Principal", // Simulamos un edificio
-        id_area: 1 
+        id_consultorio: c.id_consultorio, // Corregido: tu BD devuelve id_consultorio, no id_ui
+        nombre_consultorio: c.nombre_consultorio || c.nombre,
+        estado: c.disponible ? "disponible" : "ocupado",
+        piso: c.piso || 1,
+        edificio: c.edificio || "Principal",
+        id_area: c.id_area || 1
       }));
       setConsultorios(consultoriosFormateados);
+    } catch (error) { console.error("Error al cargar consultorios:", error); }
+  };
+
+  const fetchPacientes = async () => {
+    try {
+      const res = await apiFetch("http://localhost:3333/api/pacientes/completo");
+      const data = await res.json();
+      setPacientesBD(data);
+    } catch (error) { console.error("Error al cargar pacientes:", error); }
+  };
+
+  const fetchHabitaciones = async () => {
+    try {
+      const res = await apiFetch("http://localhost:3333/api/habitaciones");
+      const data = await res.json();
+
+      // Adaptamos los datos de la Base de Datos para que tu TarjetaHabitacion los entienda sin dar errores
+      const habitacionesFormateadas = data.map((h: any) => ({
+        id: String(h.numero_habitacion), // Usamos el número de habitación como ID visual
+        id_bd: h.id_habitacion, // Guardamos el ID real de la base de datos por si lo ocupamos para editar/borrar
+        tipo: h.tipo_habitacion || "Habitación",
+        estado: (h.estado || "disponible").toLowerCase(), // 'Disponible' pasa a 'disponible'
+        pacienteId: h.id_paciente || null,
+        tiempo: null // Esto se puede calcular después si la BD te da la fecha de ingreso
+      }));
+
+      setHabitacionesBD(habitacionesFormateadas);
     } catch (error) {
-      console.error("Error al cargar consultorios:", error);
+      console.error("Error al cargar habitaciones:", error);
     }
   };
 
   useEffect(() => {
-    fetchConsultorios();
+    const cargar = async () => {
+      await Promise.all([fetchConsultorios(), fetchPacientes(), fetchHabitaciones()]);
+    };
+    cargar();
   }, []);
 
-  // --- LÓGICA DE HABITACIONES ---
-  const actualizarEstado = (id: string, nuevoEstado: Habitacion["estado"], pacienteId: number | null = null) => {
-    updateHabitacion(id, { estado: nuevoEstado, pacienteId, tiempo: pacienteId ? "0h 0m" : null });
-    setHabitacionSeleccionada(null);
-    setPacienteAAsignar("");
-    setModoEdicionHabitacion(false);
-  };
-
-  const iniciarEdicionHabitacion = () => {
-    if (habitacionSeleccionada) {
-      setHabitacionEditada(habitacionSeleccionada);
-      setModoEdicionHabitacion(true);
-    }
-  };
-
-  const guardarEdicionHabitacion = () => {
-    if (habitacionSeleccionada && habitacionEditada.id) {
-      if (habitacionEditada.id !== habitacionSeleccionada.id) {
-        if (habitaciones.some(h => h.id === habitacionEditada.id)) {
-          alert("Ya existe una habitación con ese identificador.");
-          return;
-        }
-      }
-      updateHabitacion(habitacionSeleccionada.id, habitacionEditada);
-      setHabitacionSeleccionada({ ...habitacionSeleccionada, ...habitacionEditada } as Habitacion);
-      setModoEdicionHabitacion(false);
-    }
-  };
-
-  const handleCrearHabitacion = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nuevaHabitacion.id) return;
-    
-    addHabitacion({
-      id: nuevaHabitacion.id,
-      tipo: nuevaHabitacion.tipo,
-      estado: "disponible",
-      pacienteId: null,
-      tiempo: null
-    });
-    setModalNuevaHabitacion(false);
-    setNuevaHabitacion({ id: "", tipo: "Habitación" });
-  };
-
-  const handleEliminarHabitacion = (id: string) => {
-    deleteHabitacion(id);
-    setHabitacionSeleccionada(null);
-  };
-
   // --- LÓGICA DE CONSULTORIOS (Simulada localmente hasta tener POST/PUT en Backend) ---
-  const handleCrearConsultorio = (e: React.FormEvent) => {
+  const handleCrearConsultorio = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nuevoConsultorio.id_consultorio || !nuevoConsultorio.nombre_consultorio) return;
-    
-    const nuevo = {
-      id_consultorio: Number(nuevoConsultorio.id_consultorio),
-      nombre_consultorio: nuevoConsultorio.nombre_consultorio,
-      piso: Number(nuevoConsultorio.piso) || 1,
-      edificio: nuevoConsultorio.edificio || "Principal",
-      estado: "disponible",
-      id_area: Number(nuevoConsultorio.id_area) || 1
-    };
-    
-    setConsultorios([...consultorios, nuevo]); // Guardado local
-    setModalNuevoConsultorio(false);
-    setNuevoConsultorio({ id_consultorio: "", nombre_consultorio: "", piso: "", edificio: "", id_area: "" });
+    try {
+      const res = await apiFetch("http://localhost:3333/api/consultorios", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre_consultorio: nuevoConsultorio.nombre_consultorio,
+          piso: Number(nuevoConsultorio.piso),
+          edificio: nuevoConsultorio.edificio || "Principal",
+          id_area: Number(nuevoConsultorio.id_area) || 1
+        })
+      });
+      if (res.ok) {
+        setModalNuevoConsultorio(false);
+        setNuevoConsultorio({ id_consultorio: "", nombre_consultorio: "", piso: "", edificio: "", id_area: "" });
+        fetchConsultorios(); // Recargar la lista desde la BD
+      }
+    } catch (error) { console.error("Error al crear consultorio:", error); }
   };
 
-  const handleEliminarConsultorio = (id: number) => {
-    setConsultorios(consultorios.filter(c => c.id_consultorio !== id)); // Borrado local
-    setConsultorioSeleccionado(null);
+  const handleEliminarConsultorio = async (id: number) => {
+    if (!confirm("¿Seguro que deseas eliminar este consultorio?")) return;
+    try {
+      const res = await apiFetch(`http://localhost:3333/api/consultorios/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setConsultorioSeleccionado(null);
+        fetchConsultorios(); // Recargar
+      } else {
+        alert("No se puede eliminar porque tiene citas enlazadas.");
+      }
+    } catch (error) { console.error("Error:", error); }
   };
 
-  const actualizarEstadoConsultorio = (id: number, nuevoEstado: string) => {
-    setConsultorios(consultorios.map(c => c.id_consultorio === id ? { ...c, estado: nuevoEstado } : c));
-    setConsultorioSeleccionado(null);
+  const actualizarEstadoConsultorio = async (id: number, nuevoEstado: string) => {
+    try {
+      const isDisponible = nuevoEstado === "disponible";
+
+      await apiFetch(`http://localhost:3333/api/consultorios/${id}/estado`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ disponible: isDisponible })
+      });
+      setConsultorioSeleccionado(null);
+      fetchConsultorios();
+    } catch (error) { console.error("Error:", error); }
   };
 
   const iniciarEdicionConsultorio = () => {
@@ -156,38 +156,137 @@ export function Infraestructura() {
     }
   };
 
-  const guardarEdicionConsultorio = () => {
-    if (consultorioSeleccionado && consultorioEditado) {
-      setConsultorios(consultorios.map(c => c.id_consultorio === consultorioSeleccionado.id_consultorio ? consultorioEditado : c));
-      setConsultorioSeleccionado(consultorioEditado);
+  const guardarEdicionConsultorio = async () => {
+    if (!consultorioSeleccionado || !consultorioEditado) return;
+    try {
+      await apiFetch(`http://localhost:3333/api/consultorios/${consultorioSeleccionado.id_consultorio}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre_consultorio: consultorioEditado.nombre_consultorio,
+          piso: Number(consultorioEditado.piso),
+          edificio: consultorioEditado.edificio,
+          id_area: Number(consultorioEditado.id_area)
+        })
+      });
       setModoEdicionConsultorio(false);
+      setConsultorioSeleccionado(null);
+      fetchConsultorios();
+    } catch (error) { console.error("Error:", error); }
+  };
+
+
+  /*==============
+      HABITACIONES
+    ==============*/
+
+  // --- LÓGICA DE HABITACIONES ---
+  /*{crear habitacion}*/
+  const handleCrearHabitacion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await apiFetch("http://localhost:3333/api/habitaciones", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          numero_habitacion: nuevaHabitacion.id,
+          piso: Number(nuevaHabitacion.piso) || 1, // Asegúrate de tener 'piso' en tu estado 'nuevaHabitacion'
+          tipo_habitacion: nuevaHabitacion.tipo,
+          costo_dia: 0
+        })
+      });
+      if (res.ok) {
+        setModalNuevaHabitacion(false);
+        setNuevaHabitacion({ id: "", tipo: "Habitación", piso: "" });
+        fetchHabitaciones(); // Recargar desde BD
+      }
+    } catch (error) { console.error("Error:", error); }
+  };
+  /*{Actualizar estado Habitaciones}*/
+  const actualizarEstado = async (idVisual: string, nuevoEstado: string, pacienteId: number | null = null) => {
+    const habitacionReal = habitacionesBD.find(h => h.id === idVisual);
+    if (!habitacionReal) return;
+
+    try {
+      await apiFetch(`http://localhost:3333/api/habitaciones/${habitacionReal.id_bd}/estado`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: nuevoEstado.charAt(0).toUpperCase() + nuevoEstado.slice(1) }) // Ej: "Disponible"
+      });
+
+      setHabitacionSeleccionada(null);
+      setPacienteAAsignar("");
+      fetchHabitaciones();
+    } catch (error) { console.error("Error:", error); }
+  };
+
+  /*Menu modal para edicion*/
+  const iniciarEdicionHabitacion = () => {
+    if (habitacionSeleccionada) {
+      setHabitacionEditada(habitacionSeleccionada);
+      setModoEdicionHabitacion(true);
     }
+  };
+  /*{Guardar edicion de las habitaciones}*/
+  const guardarEdicionHabitacion = async () => {
+    if (!habitacionSeleccionada || !habitacionEditada) return;
+    try {
+      await apiFetch(`http://localhost:3333/api/habitaciones/${habitacionSeleccionada.id_bd}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          numero_habitacion: habitacionEditada.id,
+          piso: Number(habitacionEditada.piso) || 1,
+          tipo_habitacion: habitacionEditada.tipo,
+          costo_dia: habitacionEditada.costo_dia || 0
+        })
+      });
+      setModoEdicionHabitacion(false);
+      setHabitacionSeleccionada(null);
+      fetchHabitaciones();
+    } catch (error) { console.error("Error:", error); }
+  };
+
+  //Eliminar habitaciones
+  const handleEliminarHabitacion = async (idVisual: string) => {
+    if(!confirm("¿Seguro que deseas eliminar esta habitación?")) return;
+    const habitacionReal = habitacionesBD.find(h => h.id === idVisual);
+    if (!habitacionReal) return;
+
+    try {
+      const res = await apiFetch(`http://localhost:3333/api/habitaciones/${habitacionReal.id_bd}`, { method: "DELETE" });
+      if(res.ok){
+        setHabitacionSeleccionada(null);
+        fetchHabitaciones();
+      } else {
+        alert("No se puede eliminar. Puede que tenga pacientes asignados.");
+      }
+    } catch (error) { console.error("Error:", error); }
   };
 
   // --- FILTROS Y ESTADÍSTICAS ---
-  const pacientesActivos = pacientes.filter(p => p.status === 1);
-
   const habitacionesFiltradas = useMemo(() => {
-    return habitaciones.filter(h => 
-      h.id.toLowerCase().includes(busqueda.toLowerCase()) || 
+    return habitacionesBD.filter(h =>
+      h.id.toLowerCase().includes(busqueda.toLowerCase()) ||
       h.tipo.toLowerCase().includes(busqueda.toLowerCase())
     );
-  }, [habitaciones, busqueda]);
+  }, [habitacionesBD, busqueda]);
 
   const consultoriosFiltrados = useMemo(() => {
-    return consultorios.filter(c => 
+    return consultorios.filter(c =>
       c.nombre_consultorio.toLowerCase().includes(busqueda.toLowerCase()) ||
       c.edificio.toLowerCase().includes(busqueda.toLowerCase()) ||
       c.id_consultorio.toString().includes(busqueda)
     );
   }, [consultorios, busqueda]);
 
-  const statsHabitaciones = {
-    total: habitaciones.length,
-    ocupadas: habitaciones.filter(h => h.estado === 'ocupada').length,
-    disponibles: habitaciones.filter(h => h.estado === 'disponible').length,
-    mantenimiento: habitaciones.filter(h => h.estado === 'mantenimiento' || h.estado === 'limpieza').length
-  };
+  const statsHabitaciones = useMemo(() => {
+    return consultorios.filter(c =>
+      c.nombre_consultorio.toLowerCase().includes(busqueda.toLowerCase()) ||
+      c.edificio.toLowerCase().includes(busqueda.toLowerCase()) ||
+      c.id_consultorio.toString().includes(busqueda)
+    );
+  }, [consultorios, busqueda]);
 
   const statsConsultorios = {
     total: consultorios.length,
@@ -196,6 +295,12 @@ export function Infraestructura() {
     mantenimiento: consultorios.filter(c => c.estado === 'mantenimiento' || c.estado === 'limpieza').length
   };
 
+  const pacientesActivos = pacientesBD.filter(p =>
+    (p.estado || p.status || "").toUpperCase() === "EN ESPERA" || // Ajustado a los status de tu BD
+    (p.estado || p.status || "").toUpperCase() === "HOSPITALIZADO" ||
+    p.id_paciente
+  );
+
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -203,12 +308,12 @@ export function Infraestructura() {
           <h1 className="text-3xl font-semibold tracking-tight text-[#1d1d1f]">Infraestructura y Espacios</h1>
           <p className="text-[#86868b] mt-1">Control de habitaciones, consultorios y ocupación general.</p>
         </div>
-        
+
         <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
           <div className="relative">
             <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-[#86868b]" />
-            <input 
-              type="text" 
+            <input
+              type="text"
               placeholder={`Buscar ${vistaActiva}...`}
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
@@ -263,14 +368,14 @@ export function Infraestructura() {
 
       {/* Pestañas de Navegación */}
       <div className="flex items-center gap-6 border-b border-black/[0.05]">
-        <button 
+        <button
           onClick={() => setVistaActiva("habitaciones")}
           className={`flex items-center gap-2 text-sm font-semibold pb-4 -mb-[1px] transition-colors ${vistaActiva === "habitaciones" ? "text-[#1d1d1f] border-b-2 border-[#1d1d1f]" : "text-[#86868b] hover:text-[#1d1d1f]"}`}
         >
           <Bed className="w-4 h-4" />
           Habitaciones
         </button>
-        <button 
+        <button
           onClick={() => setVistaActiva("consultorios")}
           className={`flex items-center gap-2 text-sm font-semibold pb-4 -mb-[1px] transition-colors ${vistaActiva === "consultorios" ? "text-[#1d1d1f] border-b-2 border-[#1d1d1f]" : "text-[#86868b] hover:text-[#1d1d1f]"}`}
         >
@@ -292,9 +397,9 @@ export function Infraestructura() {
           {habitacionesFiltradas.length > 0 ? habitacionesFiltradas.map((habitacion) => {
             const paciente = pacientes.find(p => p.id_paciente === habitacion.pacienteId);
             return (
-              <TarjetaHabitacion 
-                key={habitacion.id} 
-                habitacion={{...habitacion, paciente: paciente ? paciente.nombre_paciente : null}} 
+              <TarjetaHabitacion
+                key={habitacion.id}
+                habitacion={{ ...habitacion, paciente: paciente ? paciente.nombre_paciente : null }}
                 onClick={() => setHabitacionSeleccionada(habitacion)}
               />
             );
@@ -309,9 +414,9 @@ export function Infraestructura() {
       {vistaActiva === "consultorios" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {consultoriosFiltrados.length > 0 ? consultoriosFiltrados.map((consultorio) => (
-            <TarjetaConsultorio 
-              key={consultorio.id_consultorio} 
-              consultorio={consultorio} 
+            <TarjetaConsultorio
+              key={consultorio.id_consultorio}
+              consultorio={consultorio}
               onClick={() => setConsultorioSeleccionado(consultorio)}
             />
           )) : (
@@ -325,17 +430,27 @@ export function Infraestructura() {
       {/* MODALES PARA HABITACIONES */}
       <Modal isOpen={modalNuevaHabitacion} onClose={() => setModalNuevaHabitacion(false)} titulo="Añadir Nueva Habitación">
         <form onSubmit={handleCrearHabitacion} className="space-y-4">
-          <Input 
-            label="Identificador (Ej. 104, C-05, Quirófano 1)" 
-            placeholder="ID del espacio" 
-            required 
-            value={nuevaHabitacion.id}
-            onChange={(e) => setNuevaHabitacion({...nuevaHabitacion, id: e.target.value})}
-          />
-          <Select 
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Identificador (Ej. 104, C-05)"
+              placeholder="ID del espacio"
+              required
+              value={nuevaHabitacion.id}
+              onChange={(e) => setNuevaHabitacion({ ...nuevaHabitacion, id: e.target.value })}
+            />
+            <Input
+              label="Piso"
+              type="number"
+              placeholder="Ej. 1, 2, 3..."
+              required
+              value={nuevaHabitacion.piso}
+              onChange={(e) => setNuevaHabitacion({ ...nuevaHabitacion, piso: e.target.value })}
+            />
+          </div>
+          <Select
             label="Tipo de Espacio"
             value={nuevaHabitacion.tipo}
-            onChange={(e) => setNuevaHabitacion({...nuevaHabitacion, tipo: e.target.value})}
+            onChange={(e) => setNuevaHabitacion({ ...nuevaHabitacion, tipo: e.target.value })}
           >
             <option value="Habitación">Habitación Regular</option>
             <option value="Urgencias">Cama de Urgencias</option>
@@ -364,15 +479,14 @@ export function Infraestructura() {
                     <h3 className="text-2xl font-bold text-[#1d1d1f]">{habitacionSeleccionada.id}</h3>
                     <p className="text-[#86868b] uppercase tracking-wider text-xs font-semibold mt-1">{habitacionSeleccionada.tipo}</p>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    habitacionSeleccionada.estado === 'ocupada' ? 'bg-red-100 text-red-700' :
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${habitacionSeleccionada.estado === 'ocupada' ? 'bg-red-100 text-red-700' :
                     habitacionSeleccionada.estado === 'disponible' ? 'bg-green-100 text-green-700' :
-                    'bg-orange-100 text-orange-700'
-                  }`}>
+                      'bg-orange-100 text-orange-700'
+                    }`}>
                     {habitacionSeleccionada.estado.charAt(0).toUpperCase() + habitacionSeleccionada.estado.slice(1)}
                   </span>
                 </div>
-                
+
                 {habitacionSeleccionada.estado === 'ocupada' && (
                   <div className="bg-gray-50 p-4 rounded-2xl border border-black/[0.05]">
                     <p className="text-sm text-[#86868b] mb-1">Paciente Actual</p>
@@ -390,19 +504,22 @@ export function Infraestructura() {
 
                 {habitacionSeleccionada.estado === 'disponible' && (
                   <div className="bg-gray-50 p-4 rounded-2xl border border-black/[0.05] space-y-3">
-                    <Select 
-                      label="Seleccionar Paciente para Ingreso"
-                      value={pacienteAAsignar.toString()}
-                      onChange={(e) => setPacienteAAsignar(e.target.value ? Number(e.target.value) : "")}
+                    <label className="text-sm font-medium text-[#1d1d1f]">Seleccionar Paciente para Ingreso</label>
+                    <select
+                      className="w-full px-4 py-2.5 bg-white rounded-xl border border-black/[0.05] shadow-sm"
+                      value={pacienteAAsignar}
+                      onChange={(e) => setPacienteAAsignar(e.target.value)} // Ya no requiere Number() si el ID es string en el paciente
                     >
                       <option value="">-- Seleccione un paciente --</option>
-                      {pacientesActivos.map(p => (
-                        <option key={p.id_paciente} value={p.id_paciente}>{p.nombre_paciente} ({p.folio})</option>
+                      {pacientesActivos.map((p) => (
+                        <option key={p.id_paciente} value={p.id_paciente}>
+                          {p.nombre_paciente} (Folio: P-{p.id_paciente})
+                        </option>
                       ))}
-                    </Select>
-                    <Boton 
+                    </select>
+                    <Boton
                       className="w-full"
-                      onClick={() => actualizarEstado(habitacionSeleccionada.id, "ocupada", pacienteAAsignar === "" ? null : pacienteAAsignar)}
+                      onClick={() => actualizarEstado(habitacionSeleccionada.id, "ocupada", pacienteAAsignar === "" ? null : Number(pacienteAAsignar))}
                       disabled={pacienteAAsignar === ""}
                     >
                       Ingresar Paciente
@@ -433,13 +550,13 @@ export function Infraestructura() {
                       </Boton>
                     )}
                   </div>
-                  
+
                   <Boton className="w-full" variante="secundario" onClick={iniciarEdicionHabitacion}>
                     <Edit2 className="w-4 h-4 mr-2" />
                     Editar Detalles
                   </Boton>
                   <Boton variante="secundario" onClick={() => { setHabitacionSeleccionada(null); setPacienteAAsignar(""); }}>Cerrar</Boton>
-                  
+
                   {habitacionSeleccionada.estado !== 'ocupada' && (
                     <Boton variante="peligro" onClick={() => handleEliminarHabitacion(habitacionSeleccionada.id)}>Eliminar Habitación</Boton>
                   )}
@@ -447,15 +564,15 @@ export function Infraestructura() {
               </>
             ) : (
               <div className="space-y-4">
-                <Input 
-                  label="Identificador (Ej. 104, C-05)" 
+                <Input
+                  label="Identificador (Ej. 104, C-05)"
                   value={habitacionEditada.id || ""}
-                  onChange={(e) => setHabitacionEditada({...habitacionEditada, id: e.target.value})}
+                  onChange={(e) => setHabitacionEditada({ ...habitacionEditada, id: e.target.value })}
                 />
-                <Select 
+                <Select
                   label="Tipo de Espacio"
                   value={habitacionEditada.tipo || ""}
-                  onChange={(e) => setHabitacionEditada({...habitacionEditada, tipo: e.target.value})}
+                  onChange={(e) => setHabitacionEditada({ ...habitacionEditada, tipo: e.target.value })}
                 >
                   <option value="Habitación">Habitación Regular</option>
                   <option value="Urgencias">Cama de Urgencias</option>
@@ -463,7 +580,7 @@ export function Infraestructura() {
                   <option value="Consultorio">Consultorio Médico</option>
                   <option value="Quirófano">Quirófano</option>
                 </Select>
-                
+
                 <div className="flex flex-col gap-3 pt-4 border-t border-black/[0.05]">
                   <Boton onClick={guardarEdicionHabitacion}>
                     <Save className="w-4 h-4 mr-2" />
@@ -484,43 +601,43 @@ export function Infraestructura() {
       <Modal isOpen={modalNuevoConsultorio} onClose={() => setModalNuevoConsultorio(false)} titulo="Añadir Nuevo Consultorio">
         <form onSubmit={handleCrearConsultorio} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <Input 
-              label="ID Consultorio" 
+            <Input
+              label="ID Consultorio"
               type="number"
-              placeholder="Ej. 101" 
-              required 
+              placeholder="Ej. 101"
+              required
               value={nuevoConsultorio.id_consultorio}
-              onChange={(e) => setNuevoConsultorio({...nuevoConsultorio, id_consultorio: e.target.value})}
+              onChange={(e) => setNuevoConsultorio({ ...nuevoConsultorio, id_consultorio: e.target.value })}
             />
-            <Input 
-              label="Nombre Consultorio" 
-              placeholder="Ej. Pediatría 1" 
-              required 
+            <Input
+              label="Nombre Consultorio"
+              placeholder="Ej. Pediatría 1"
+              required
               value={nuevoConsultorio.nombre_consultorio}
-              onChange={(e) => setNuevoConsultorio({...nuevoConsultorio, nombre_consultorio: e.target.value})}
+              onChange={(e) => setNuevoConsultorio({ ...nuevoConsultorio, nombre_consultorio: e.target.value })}
             />
-            <Input 
-              label="Piso" 
+            <Input
+              label="Piso"
               type="number"
-              placeholder="Ej. 1" 
-              required 
+              placeholder="Ej. 1"
+              required
               value={nuevoConsultorio.piso}
-              onChange={(e) => setNuevoConsultorio({...nuevoConsultorio, piso: e.target.value})}
+              onChange={(e) => setNuevoConsultorio({ ...nuevoConsultorio, piso: e.target.value })}
             />
-            <Input 
-              label="Edificio" 
-              placeholder="Ej. Principal" 
-              required 
+            <Input
+              label="Edificio"
+              placeholder="Ej. Principal"
+              required
               value={nuevoConsultorio.edificio}
-              onChange={(e) => setNuevoConsultorio({...nuevoConsultorio, edificio: e.target.value})}
+              onChange={(e) => setNuevoConsultorio({ ...nuevoConsultorio, edificio: e.target.value })}
             />
-            <Input 
-              label="ID Área" 
+            <Input
+              label="ID Área"
               type="number"
-              placeholder="Ej. 1" 
-              required 
+              placeholder="Ej. 1"
+              required
               value={nuevoConsultorio.id_area}
-              onChange={(e) => setNuevoConsultorio({...nuevoConsultorio, id_area: e.target.value})}
+              onChange={(e) => setNuevoConsultorio({ ...nuevoConsultorio, id_area: e.target.value })}
             />
           </div>
           <div className="pt-4 flex justify-end gap-3">
@@ -543,15 +660,14 @@ export function Infraestructura() {
                     <h3 className="text-2xl font-bold text-[#1d1d1f]">{consultorioSeleccionado.nombre_consultorio}</h3>
                     <p className="text-[#86868b] uppercase tracking-wider text-xs font-semibold mt-1">ID: {consultorioSeleccionado.id_consultorio}</p>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    consultorioSeleccionado.estado === 'ocupado' || consultorioSeleccionado.estado === 'ocupada' ? 'bg-red-100 text-red-700' :
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${consultorioSeleccionado.estado === 'ocupado' || consultorioSeleccionado.estado === 'ocupada' ? 'bg-red-100 text-red-700' :
                     consultorioSeleccionado.estado === 'disponible' ? 'bg-green-100 text-green-700' :
-                    'bg-orange-100 text-orange-700'
-                  }`}>
+                      'bg-orange-100 text-orange-700'
+                    }`}>
                     {consultorioSeleccionado.estado.charAt(0).toUpperCase() + consultorioSeleccionado.estado.slice(1)}
                   </span>
                 </div>
-                
+
                 <div className="bg-gray-50 p-4 rounded-2xl border border-black/[0.05] space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-[#86868b]">Edificio</span>
@@ -602,34 +718,34 @@ export function Infraestructura() {
               </>
             ) : (
               <div className="space-y-4">
-                <Input 
-                  label="Nombre Consultorio" 
+                <Input
+                  label="Nombre Consultorio"
                   value={consultorioEditado.nombre_consultorio || ""}
-                  onChange={(e) => setConsultorioEditado({...consultorioEditado, nombre_consultorio: e.target.value})}
+                  onChange={(e) => setConsultorioEditado({ ...consultorioEditado, nombre_consultorio: e.target.value })}
                 />
                 <div className="grid grid-cols-2 gap-4">
-                  <Input 
-                    label="Piso" 
+                  <Input
+                    label="Piso"
                     type="number"
                     value={consultorioEditado.piso?.toString() || ""}
-                    onChange={(e) => setConsultorioEditado({...consultorioEditado, piso: Number(e.target.value)})}
+                    onChange={(e) => setConsultorioEditado({ ...consultorioEditado, piso: Number(e.target.value) })}
                   />
-                  <Input 
-                    label="Edificio" 
+                  <Input
+                    label="Edificio"
                     value={consultorioEditado.edificio || ""}
-                    onChange={(e) => setConsultorioEditado({...consultorioEditado, edificio: e.target.value})}
+                    onChange={(e) => setConsultorioEditado({ ...consultorioEditado, edificio: e.target.value })}
                   />
                 </div>
-                <Select 
+                <Select
                   label="Área Asignada"
                   value={consultorioEditado.id_area?.toString() || ""}
-                  onChange={(e) => setConsultorioEditado({...consultorioEditado, id_area: Number(e.target.value)})}
+                  onChange={(e) => setConsultorioEditado({ ...consultorioEditado, id_area: Number(e.target.value) })}
                 >
                   {Object.entries(AREAS_MAP).map(([id, nombre]) => (
                     <option key={id} value={id}>{nombre}</option>
                   ))}
                 </Select>
-                
+
                 <div className="flex flex-col gap-3 pt-4 border-t border-black/[0.05]">
                   <Boton onClick={guardarEdicionConsultorio}>
                     <Save className="w-4 h-4 mr-2" />

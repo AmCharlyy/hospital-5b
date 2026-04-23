@@ -7,7 +7,6 @@ import { Boton } from "./comunes/Boton";
 import { Input } from "./comunes/Input";
 import { Select } from "./comunes/Select";
 import { useAppStore, Auxiliar } from "../context/AppContext";
-import { apiFetch } from "../api";
 
 export function PanelAuxiliares() {
   const { auxiliares, addAuxiliar, deleteAuxiliar, updateAuxiliar, fetchAuxiliares } = useAppStore();
