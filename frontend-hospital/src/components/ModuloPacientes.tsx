@@ -563,7 +563,7 @@ export function ModuloPacientes() {
                       setConfirmandoBaja(pacienteSeleccionado);
                       setPacienteSeleccionado(null);
                     }}
-                    className="w-full bg-red-500 text-white hover:bg-red-700 border-none shadow-none"
+                    className="w-full bg-red-700 hover:bg-red-500 border-none shadow-none"
                   >
                     Dar de Baja (Retirar del Sistema)
                   </Boton>

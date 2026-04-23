@@ -366,7 +366,7 @@ export function DirectorioPersonal() {
               <Boton type="button" variante="secundario" onClick={() => setConfirmandoBaja(null)}>Cancelar</Boton>
               <Boton
                 type="button"
-                className="bg-red-500 hover:bg-red-600 text-white border-none"
+                className="bg-red-700 hover:bg-red-500 text-white border-none"
                 onClick={() => handleDarDeBaja(confirmandoBaja)}
               >
                 Sí, dar de baja
@@ -569,8 +569,8 @@ export function DirectorioPersonal() {
                 onChange={(e) => setEmpleadoAEditar({ ...empleadoAEditar, usuario: e.target.value })}
               />
             )}
-            
-              {/* ESTADO OPERATIVO (Solo para Doctores y Enfermeros) */}
+
+            {/* ESTADO OPERATIVO (Solo para Doctores y Enfermeros) */}
             {(empleadoAEditar.tipo === "doctor" || empleadoAEditar.tipo === "enfermero") && (
               <Select
                 label="Estado Operativo"
@@ -597,10 +597,10 @@ export function DirectorioPersonal() {
       <Modal isOpen={!!empleadoSeleccionado} onClose={() => setEmpleadoSeleccionado(null)} titulo="Perfil del Personal">
         {empleadoSeleccionado && (
           <div className="space-y-6">
-            
+
             {/* Cabecera: Avatar y Nombre */}
             <div className="text-center">
-              <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center text-blue-600 font-semibold text-3xl shadow-sm mb-4">
+              <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center text-aqua-hospital font-semibold text-3xl shadow-sm mb-4">
                 {empleadoSeleccionado.avatar}
               </div>
               <h3 className="text-2xl font-semibold text-[#1d1d1f]">{empleadoSeleccionado.nombre}</h3>
@@ -608,22 +608,24 @@ export function DirectorioPersonal() {
             </div>
 
             {/* Información Técnica */}
-            <div className="bg-gray-50 p-5 rounded-2xl border border-black/[0.05] space-y-3">
-              <div className="flex justify-between items-center pb-2 border-b border-black/[0.05]">
-                <span className="text-sm text-[#86868b]">Estado Operativo</span>
-                <span className={`text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md ${getEstadoColor(empleadoSeleccionado.estado)} text-white`}>
-                  {empleadoSeleccionado.estado}
-                </span>
-              </div>
-              
+            <div className="bg-gray-50 p-4 rounded-2xl border border-black/[0.05] text-left space-y-3">
               {([
-                ["Tipo de Personal", <span className="capitalize">{empleadoSeleccionado.tipo}</span>],
-                ["ID del Sistema", empleadoSeleccionado.id],
-                ...(empleadoSeleccionado.usuario ? [["Usuario", empleadoSeleccionado.usuario]] : []),
-                ...(empleadoSeleccionado.cedula_profesional ? [["Cédula Profesional", empleadoSeleccionado.cedula_profesional]] : []),
+
+                ...(empleadoSeleccionado.tipo !== 'administrativo'
+                  ? [["Estado",
+                    <span className="px-2 py-1 rounded-md text-xs font-bold uppercase bg-white border border-black/10 text-gray-700">
+                      {empleadoSeleccionado.estado}
+                    </span>
+                  ]]
+                  : []
+                ),
+                ["Tipo", <span className="capitalize">{empleadoSeleccionado.tipo}</span>],
+                ["ID Empleado", empleadoSeleccionado.id],
+                ...(empleadoSeleccionado.cedula_profesional ? [["Cédula", empleadoSeleccionado.cedula_profesional]] : []),
                 ...(empleadoSeleccionado.telefono ? [["Teléfono", empleadoSeleccionado.telefono]] : []),
                 ...(empleadoSeleccionado.correo ? [["Correo", empleadoSeleccionado.correo]] : []),
                 ...(empleadoSeleccionado.consultorio ? [["Consultorio", empleadoSeleccionado.consultorio]] : []),
+                ...(empleadoSeleccionado.usuario ? [["Usuario", empleadoSeleccionado.usuario]] : []),
               ] as [string, React.ReactNode][]).map(([label, value], i) => (
                 <div key={i} className="flex justify-between items-center">
                   <span className="text-sm text-[#86868b]">{label}</span>
@@ -632,48 +634,40 @@ export function DirectorioPersonal() {
               ))}
             </div>
             <div className="pt-4 space-y-4">
-              <h4 className="text-xs font-bold text-[#86868b] uppercase tracking-wider">Acciones de Gestión</h4>
-              
-              <div className="grid grid-cols-2 gap-3">
+              <h4 className="text-xs font-bold text-[#86868b] uppercase tracking-wider text-center">Acciones de Gestión</h4>
+
+              <div className="flex justify-center gap-3">
+
                 {/* 1. Botón Editar */}
-                <button 
+                <button
                   onClick={() => {
                     setEmpleadoSeleccionado(null);
                     setEmpleadoAEditar(empleadoSeleccionado);
                   }}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors shadow-sm"
+                  className="px-6 py-2.5 bg-indigo-hospital hover:bg-aqua-hospital text-white text-sm font-medium rounded-xl transition-all shadow-sm"
                 >
                   Editar Datos
                 </button>
 
-                {/* 2. Botón Secundaria (Asignar Turno o similar) */}
+                {/* 2. Botón Baja/Reingreso */}
                 <button 
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-sm font-medium rounded-xl transition-colors shadow-sm"
+                  onClick={() => {
+                    if (empleadoSeleccionado.estado === 'Inactivo' || empleadoSeleccionado.estado === 'Eliminado') {
+                      handleReingresarPersonal(empleadoSeleccionado);
+                    } else {
+                      setConfirmandoBaja(empleadoSeleccionado);
+                    }
+                    setEmpleadoSeleccionado(null);
+                  }}
+                  className={`px-6 py-2.5 border text-sm font-medium rounded-xl transition-all ${empleadoSeleccionado.estado === 'Inactivo' || empleadoSeleccionado.estado === 'Eliminado'
+                      ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                      : "bg-red-500 text-white hover:bg-red-400"
+                    }`}
                 >
-                  Asignar Turno
+                  {empleadoSeleccionado.estado === 'Inactivo' || empleadoSeleccionado.estado === 'Eliminado'
+                    ? "Reingresar al Sistema"
+                    : "Dar de Baja"}
                 </button>
-              </div>
-
-              {/* 3. Acciones de Estado (Baja / Reingreso) */}
-              <div className="pt-2 border-t border-black/[0.05]">
-                {empleadoSeleccionado.estado === 'Inactivo' || empleadoSeleccionado.estado === 'Eliminado' ? (
-                  <button 
-                    onClick={() => { handleReingresarPersonal(empleadoSeleccionado); setEmpleadoSeleccionado(null); }}
-                    className="w-full py-3 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-sm font-bold rounded-xl transition-colors"
-                  >
-                    Reingresar al Sistema (Activar)
-                  </button>
-                ) : (
-                  <button 
-                    onClick={() => {
-                      setEmpleadoSeleccionado(null);
-                      setTimeout(() => setConfirmandoBaja(empleadoSeleccionado), 50);
-                    }}
-                    className="w-full py-3 bg-white border border-red-200 text-red-600 hover:bg-red-50 text-sm font-medium rounded-xl transition-colors"
-                  >
-                    Dar de Baja (Revocar Acceso)
-                  </button>
-                )}
               </div>
             </div>
           </div>
